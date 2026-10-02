@@ -1,0 +1,448 @@
+/* ==============================================================================
+   CAMPUSFLOW MVP — COMMON SHELL LAYOUT
+   Desktop & Mobile Grid/Flex Hierarchy
+   ============================================================================== */
+
+/* Master Application Shell Container */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   1. TOP APPLICATION HEADER
+   -------------------------------------------------------------------------- */
+.app-header {
+  height: var(--header-height);
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-4);
+  box-shadow: var(--shadow-xs);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Hamburger Toggle Button */
+.btn-hamburger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: background-color var(--transition-fast);
+}
+
+.btn-hamburger:hover {
+  background-color: var(--surface-hover);
+}
+
+.hamburger-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+}
+
+.hamburger-icon span {
+  display: block;
+  height: 2px;
+  width: 100%;
+  background-color: var(--text);
+  border-radius: var(--radius-full);
+  transition: transform var(--transition-fast);
+}
+
+/* CampusFlow Brand Branding */
+.brand-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+  color: var(--text);
+}
+
+.brand-link:hover {
+  text-decoration: none;
+}
+
+.brand-logo-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: #FFFFFF;
+  font-weight: var(--font-bold);
+  font-size: var(--text-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 87, 255, 0.25);
+}
+
+.brand-name {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.brand-tag {
+  font-size: var(--text-xs);
+  padding: 2px 6px;
+  background-color: var(--primary-subtle);
+  color: var(--primary-text);
+  border-radius: var(--radius-full);
+  font-weight: var(--font-semibold);
+  margin-left: var(--space-1);
+}
+
+/* Dynamic Greeting Chip */
+.greeting-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+}
+
+.greeting-name {
+  font-weight: var(--font-semibold);
+  color: var(--text);
+}
+
+/* --------------------------------------------------------------------------
+   2. INSTITUTION & CAMPUS NOTICE BOARD (MANDATORY: IMMEDIATELY BELOW HEADER)
+   -------------------------------------------------------------------------- */
+.notice-board-banner {
+  background-color: var(--surface-elevated);
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-2) var(--space-4);
+  position: relative;
+  z-index: var(--z-notice);
+  box-shadow: var(--shadow-xs);
+  transition: all var(--transition-fast);
+}
+
+.notice-board-container {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+}
+
+.notice-board-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.notice-board-title-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text);
+}
+
+.notice-board-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background-color: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-text);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+}
+
+.notice-board-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.btn-notice-toggle {
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all var(--transition-fast);
+}
+
+.btn-notice-toggle:hover {
+  background-color: var(--surface-hover);
+  color: var(--text);
+}
+
+.notice-carousel {
+  margin-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.notice-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+}
+
+.notice-item.urgent {
+  border-left-color: var(--error);
+  background-color: var(--error-bg);
+}
+
+.notice-item.cancelled {
+  border-left-color: var(--error);
+}
+
+.notice-item.room_changed, .notice-item.rescheduled {
+  border-left-color: var(--warning);
+}
+
+.notice-content {
+  flex: 1;
+}
+
+.notice-title {
+  font-weight: var(--font-bold);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.notice-details {
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.notice-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+/* --------------------------------------------------------------------------
+   3. OFFLINE STATUS BANNER
+   -------------------------------------------------------------------------- */
+.offline-banner {
+  background-color: #FEF3C7;
+  color: #92400E;
+  border-bottom: 1px solid #FCD34D;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  z-index: var(--z-notice);
+}
+
+[data-theme="dark"] .offline-banner {
+  background-color: #78350F;
+  color: #FEF3C7;
+  border-color: #92400E;
+}
+
+/* --------------------------------------------------------------------------
+   4. MAIN WORKSPACE WITH SIDEBAR & CONTENT VIEW
+   -------------------------------------------------------------------------- */
+.app-body {
+  display: flex;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Sidebar Navigation */
+.app-sidebar {
+  width: var(--sidebar-width);
+  background-color: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--transition-normal), width var(--transition-normal);
+  z-index: var(--z-sidebar);
+  flex-shrink: 0;
+}
+
+.sidebar-header {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-role-badge {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background-color: var(--primary-subtle);
+  color: var(--primary-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: var(--space-3) var(--space-2);
+  overflow-y: auto;
+}
+
+.nav-section-title {
+  font-size: 0.7rem;
+  font-weight: var(--font-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: var(--space-2) var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+  text-decoration: none;
+}
+
+.nav-link:hover {
+  background-color: var(--surface-hover);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.nav-link.active {
+  background-color: var(--primary-subtle);
+  color: var(--primary);
+  font-weight: var(--font-semibold);
+}
+
+.nav-link-icon {
+  font-size: 1.1rem;
+  width: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-link-badge {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background-color: var(--border);
+  color: var(--text-secondary);
+}
+
+.nav-link.active .nav-link-badge {
+  background-color: var(--primary);
+  color: #FFFFFF;
+}
+
+.sidebar-footer {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Sidebar Mobile Overlay */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: calc(var(--z-sidebar) - 1);
+}
+
+.sidebar-overlay.active {
+  display: block;
+}
+
+/* Main Content Workspace */
+.app-main {
+  flex: 1;
+  padding: var(--space-5);
+  overflow-y: auto;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Application Footer */
+.app-footer {
+  padding: var(--space-4);
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  background-color: var(--surface);
+  margin-top: auto;
+}

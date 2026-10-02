@@ -1,0 +1,39 @@
+services:
+  # ==============================================================================
+  # CampusFlow Backend — FastAPI Asynchronous Web Service
+  # ==============================================================================
+  - type: web
+    name: campusflow-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRY
+        value: "86400"
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: SMS_PROVIDER_MODE
+        value: console
+      - key: UPLOAD_DIR
+        value: uploads
+
+  # ==============================================================================
+  # CampusFlow Frontend — Vanilla HTML5/CSS3/JS Static Site (No Node.js Required)
+  # ==============================================================================
+  - type: web
+    name: campusflow-frontend
+    runtime: static
+    rootDir: frontend
+    staticPublishPath: .
+    autoDeploy: false

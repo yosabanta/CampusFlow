@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="description" content="CampusFlow — Unified Campus Operations Platform for BPUT Hackathon 2026. Gate passes, complaints, academics, and notifications.">
+  <meta name="theme-color" content="#0057FF">
+  <title>CampusFlow — Operations Platform</title>
+
+  <!-- PWA Web App Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="assets/icons/icon-192.svg">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.svg">
+
+  <!-- Core Modular CSS Architecture (Zero Framework Overhead) -->
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/themes.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/tables.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <!-- Standalone Login View Container (Active when unauthenticated) -->
+  <div id="login-view-container" style="display: none;" role="region" aria-label="Authentication"></div>
+
+  <!-- Authenticated Unified Common Application Shell -->
+  <div id="authenticated-app" class="app-shell" style="display: none;">
+    <!-- 1. TOP HEADER (DESKTOP & MOBILE) -->
+    <header class="app-header" role="banner">
+      <div class="header-left">
+        <button id="btn-hamburger" class="btn-hamburger" type="button" aria-label="Toggle navigation menu" aria-expanded="false">
+          <div class="hamburger-icon" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </button>
+        <a href="#dashboard" class="brand-link" aria-label="CampusFlow Dashboard">
+          <div class="brand-logo-badge" aria-hidden="true">CF</div>
+          <span class="brand-name">CampusFlow</span>
+          <span class="brand-tag">Phase 7 Shell</span>
+        </a>
+      </div>
+
+      <div class="header-right">
+        <!-- Dynamic Greeting ("Good morning, Priya") -->
+        <div id="header-greeting" class="greeting-chip" aria-live="polite"></div>
+
+        <!-- Notification Bell Trigger & Live Unread Badge -->
+        <div class="notification-trigger-wrap">
+          <button id="btn-notification" class="btn-notification" type="button" aria-label="View notifications">
+            <span aria-hidden="true">🔔</span>
+            <span id="notif-badge" class="notification-badge hidden" aria-live="polite">0</span>
+          </button>
+
+          <!-- Notification Dropdown Panel -->
+          <div id="notification-panel" class="notification-panel" role="dialog" aria-label="Notifications center">
+            <div class="notification-panel-header">
+              <span class="notification-panel-title">
+                <span>🔔 Notifications</span>
+              </span>
+              <button id="btn-close-notifs" class="btn btn-sm btn-outline" type="button" style="padding: 2px 6px;">✕</button>
+            </div>
+            <div id="notif-panel-body" class="notification-panel-body" tabindex="0">
+              <div class="state-container" style="padding: 20px;">
+                <div class="spinner"></div>
+                <div style="font-size: 12px; color: var(--text-muted);">Loading notifications...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Account Profile Chip & Dropdown -->
+        <div class="account-menu-wrap">
+          <div id="account-chip" class="account-chip" role="button" tabindex="0" aria-label="User account menu" aria-haspopup="true">
+            <div id="account-avatar" class="account-avatar">CF</div>
+            <span id="account-name" class="account-chip-name">Account</span>
+            <span style="font-size: 10px; color: var(--text-muted);">▼</span>
+          </div>
+
+          <!-- Account Dropdown Panel -->
+          <div id="account-dropdown" class="account-dropdown" role="menu"></div>
+        </div>
+
+        <!-- Theme Switcher Button (☀️ / 🌙) -->
+        <button id="theme-toggle-btn" class="btn-theme-toggle" type="button" aria-label="Toggle theme">
+          🌙
+        </button>
+
+        <!-- Quick Logout Button -->
+        <button id="btn-header-logout" class="btn btn-sm btn-outline" type="button" title="Sign out of CampusFlow">
+          <span>Sign Out</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- 2. OFFLINE STATUS INDICATOR BANNER (Low-Bandwidth Resilience) -->
+    <div id="offline-banner" class="offline-banner" style="display: none;" role="status">
+      <span>📡</span>
+      <span>Offline — Some real-time features may be unavailable. Cached application shell active.</span>
+    </div>
+
+    <!-- 3. CAMPUS & INSTITUTION NOTICE BOARD (MANDATORY: IMMEDIATELY BELOW HEADER) -->
+    <aside id="notice-board-banner" class="notice-board-banner" aria-label="Campus Notice Board">
+      <div id="notice-board-container" class="notice-board-container"></div>
+    </aside>
+
+    <!-- 4. APP WORKSPACE (RBAC SIDEBAR + MAIN CONTENT AREA) -->
+    <div id="app-body" class="app-body">
+      <!-- Mobile Drawer Backdrop Overlay -->
+      <div id="sidebar-overlay" class="sidebar-overlay" aria-hidden="true"></div>
+
+      <!-- Left RBAC Navigation Sidebar -->
+      <nav id="app-sidebar" class="app-sidebar" aria-label="Institutional Navigation">
+        <div class="sidebar-header">
+          <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Active Role</span>
+          <span id="sidebar-role-badge" class="sidebar-role-badge">Student</span>
+        </div>
+        <div id="sidebar-nav-container" class="sidebar-nav"></div>
+        <div class="sidebar-footer">
+          <span>CampusFlow v1.0.0</span>
+          <span>BPUT 2026</span>
+        </div>
+      </nav>
+
+      <!-- Main Application Content Area -->
+      <main id="app-main" class="app-main" role="main">
+        <div id="app-main-content">
+          <div class="state-container" style="padding: 60px 20px;">
+            <div class="spinner"></div>
+            <div class="state-title" style="margin-top: 12px;">Loading Workspace...</div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- 5. APPLICATION FOOTER -->
+    <footer class="app-footer" role="contentinfo">
+      <div>CampusFlow Unified Operations Platform &bull; High-Cohesion Modular Monolith &bull; Low-Bandwidth Campus Architecture</div>
+    </footer>
+  </div>
+
+  <!-- Global Toast Alerts Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Deployment Backend API Configuration Hook -->
+  <!-- For public hosting, set window.BACKEND_API_URL to your Render Web Service URL (e.g. "https://campusflow-backend.onrender.com") -->
+  <!-- When left as empty string or unset, it automatically falls back to "http://localhost:8000" for local development -->
+  <script>
+    window.BACKEND_API_URL = window.BACKEND_API_URL || "";
+  </script>
+
+  <!-- Native ES Module Application Bootstrap -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

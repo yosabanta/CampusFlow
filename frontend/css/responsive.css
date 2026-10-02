@@ -1,0 +1,99 @@
+/* ==============================================================================
+   CAMPUSFLOW MVP — RESPONSIVE ADAPTATIONS
+   360px (Mobile), 768px (Tablet), 1024px+ (Desktop)
+   ============================================================================== */
+
+/* Desktop Specifics (>= 1024px) */
+@media (min-width: 1024px) {
+  .btn-hamburger {
+    display: none; /* Persistent visible sidebar on wide desktop screens */
+  }
+}
+
+/* Tablet & Mobile Screens (< 1024px) */
+@media (max-width: 1023px) {
+  .app-sidebar {
+    position: fixed;
+    top: var(--header-height);
+    bottom: 0;
+    left: 0;
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-lg);
+    z-index: var(--z-sidebar);
+  }
+
+  .app-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .app-main {
+    padding: var(--space-4);
+  }
+}
+
+/* Small Mobile Screens (360px - 600px) */
+@media (max-width: 600px) {
+  :root {
+    --header-height: 56px;
+  }
+
+  .app-header {
+    padding: 0 var(--space-2);
+  }
+
+  .brand-name {
+    font-size: var(--text-base);
+  }
+
+  .brand-tag {
+    display: none; /* Hide 'Phase 7' badge on tiny screens to save space */
+  }
+
+  .greeting-chip {
+    display: none; /* Greeting moves into notice/dashboard on small mobile */
+  }
+
+  .account-chip-name {
+    display: none; /* Only avatar shown in header on mobile */
+  }
+
+  .notice-board-banner {
+    padding: var(--space-2);
+  }
+
+  .notice-item {
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .notice-meta {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .app-main {
+    padding: var(--space-3);
+  }
+
+  .login-card {
+    margin: var(--space-3) auto;
+    padding: var(--space-4);
+    box-shadow: none;
+    border-radius: var(--radius-lg);
+  }
+
+  .demo-chips-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .toast-container {
+    left: var(--space-3);
+    right: var(--space-3);
+    bottom: var(--space-3);
+  }
+
+  .toast {
+    max-width: 100%;
+    min-width: unset;
+  }
+}

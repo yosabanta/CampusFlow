@@ -1,0 +1,78 @@
+/* ==============================================================================
+   CAMPUSFLOW MVP — THEMES (LIGHT, DARK, PREFERS-CONTRAST)
+   ============================================================================== */
+
+/* Dark Theme (Graphite Canvas, Deep Slate Surfaces) */
+[data-theme="dark"] {
+  --primary: #3B82F6;
+  --primary-hover: #60A5FA;
+  --primary-subtle: #1E293B;
+  --primary-text: #93C5FD;
+  --secondary: #F8FAFC;
+  --secondary-hover: #E2E8F0;
+  --accent: #34D399;
+  --accent-subtle: #064E3B;
+
+  --background: #0B0F19;
+  --surface: #151D2E;
+  --surface-elevated: #1B2438;
+  --surface-hover: #222D46;
+  --surface-active: #2C3955;
+
+  --text: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --text-inverse: #0F172A;
+
+  --border: #2A364F;
+  --border-subtle: #1E283D;
+  --border-focus: #3B82F6;
+
+  --success: #10B981;
+  --success-bg: #064E3B;
+  --success-border: #047857;
+  --success-text: #A7F3D0;
+
+  --warning: #F59E0B;
+  --warning-bg: #451A03;
+  --warning-border: #B45309;
+  --warning-text: #FDE68A;
+
+  --error: #EF4444;
+  --error-bg: #450A0A;
+  --error-border: #B91C1C;
+  --error-text: #FECACA;
+
+  --info: #38BDF8;
+  --info-bg: #082F49;
+  --info-border: #0369A1;
+  --info-text: #BAE6FD;
+
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.7);
+  --shadow-dropdown: 0 16px 28px -4px rgba(0, 0, 0, 0.75);
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High Contrast Mode Adjustments */
+@media (prefers-contrast: more) {
+  :root {
+    --border: #64748B;
+    --border-subtle: #94A3B8;
+  }
+  [data-theme="dark"] {
+    --border: #94A3B8;
+    --border-subtle: #CBD5E1;
+  }
+}
