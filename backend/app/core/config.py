@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads"
 
     # Cross-Origin Resource Sharing (CORS)
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5500,http://127.0.0.1:5500,http://localhost:8000,http://127.0.0.1:8000,http://localhost:8080"
+    ALLOWED_ORIGINS: str = "https://campusflow-frontend-khaki.vercel.app,http://localhost:3000,http://localhost:5500,http://127.0.0.1:5500,http://localhost:8000,http://127.0.0.1:8000,http://localhost:8080"
 
     # SMS Provider Mode ('mock', 'console', 'live')
     SMS_PROVIDER_MODE: str = "console"
