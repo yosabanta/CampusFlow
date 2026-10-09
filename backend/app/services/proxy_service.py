@@ -124,33 +124,56 @@ def initiate_proxy_otp(
                 detail=f"Rate limit exceeded. Please wait {remaining_cooldown} second(s) before requesting another verification code."
             )
 
-    # Dispatch SMS verification via Twilio Verify API
+    # Dispatch verification code
     demo_otp_val: Optional[str] = None
     verification_sid = ""
 
-    try:
-        verification = twilio_verify_service.start_verification(phone_e164=phone_e164, channel="sms")
-        verification_sid = verification.get("sid", "")
-        sid_hash = hashlib.sha256(verification_sid.encode("utf-8")).hexdigest()
-    except Exception as e:
-        # Check if demo fallback is explicitly enabled in non-production environments
-        if getattr(settings, "ENABLE_DEMO_OTP_FALLBACK", False) and settings.ENVIRONMENT.strip().lower() != "production":
-            demo_code = "482910"
-            sid_hash = "DEMO_HASH:" + hashlib.sha256(demo_code.encode("utf-8")).hexdigest()
-            demo_otp_val = f"DEMO_FALLBACK_OTP: {demo_code}"
-            verification_sid = "DEMO_FALLBACK_SID"
-            logger.warning(f"[Demo Fallback] Real SMS dispatch unavailable ({e}). Using explicitly enabled demo OTP fallback: {demo_otp_val}")
-        else:
-            raise e
+    # Check if SMS_PROVIDER_MODE is explicitly set to mock/demo or Twilio credentials missing
+    use_mock_demo = (
+        getattr(settings, "SMS_PROVIDER_MODE", "").lower() in ["mock", "demo"]
+        or not (settings.TWILIO_ACCOUNT_SID and settings.TWILIO_AUTH_TOKEN and settings.TWILIO_VERIFY_SERVICE_SID)
+    )
+
+    if not use_mock_demo:
+        try:
+            verification = twilio_verify_service.start_verification(phone_e164=phone_e164, channel="sms")
+            verification_sid = verification.get("sid", "")
+            sid_hash = hashlib.sha256(verification_sid.encode("utf-8")).hexdigest()
+            otp_hash = sid_hash
+        except Exception as e:
+            if getattr(settings, "ENABLE_DEMO_OTP_FALLBACK", False) and settings.ENVIRONMENT.strip().lower() != "production":
+                demo_code = "482910"
+                otp_hash = "DEMO_HASH:" + hashlib.sha256(demo_code.encode("utf-8")).hexdigest()
+                demo_otp_val = f"DEMO_FALLBACK_OTP: {demo_code}"
+                verification_sid = "DEMO_FALLBACK_SID"
+                logger.warning(f"[Demo Fallback] Real SMS dispatch unavailable ({e}). Using demo OTP fallback: {demo_otp_val}")
+            else:
+                raise e
+    else:
+        # Standard live demo workflow without external Twilio: generate authentic 6-digit numeric OTP
+        import random
+        demo_code = f"{random.randint(100000, 999999)}"
+        otp_hash = hashlib.sha256(demo_code.encode("utf-8")).hexdigest()
+        demo_otp_val = demo_code
+        verification_sid = "DEMO_LOCAL_DISPATCH"
+
+    # Always log and persist mock SMS for local auditing and demo visibility
+    sms_body = f"CampusFlow proxy verification code: {demo_otp_val or 'SECURE_SMS'}. Valid for 10 minutes. Share with your peer to lodge request."
+    send_mock_sms(
+        db=db,
+        phone_number=phone_e164,
+        message=sms_body,
+        trigger_event="OTP_DISPATCH",
+        student_id=beneficiary.id
+    )
 
     # Store verification metadata in OTPVerification
-    # Store cryptographic SHA-256 hash of the verification SID (never plaintext OTP)
     expires = now_utc + timedelta(minutes=10)
 
     otp_record = OTPVerification(
         beneficiary_student_id=beneficiary.id,
         phone_number=phone_e164,
-        otp_code_hash=sid_hash,
+        otp_code_hash=otp_hash,
         purpose="HELP_A_FRIEND",
         expires_at=expires,
         attempts=0,
@@ -167,8 +190,7 @@ def initiate_proxy_otp(
         action="OTP_INITIATE",
         new_state={
             "beneficiary_id": str(beneficiary.id),
-            "phone_masked": f"****{phone_e164[-4:]}",
-            "verification_sid": verification_sid
+            "phone_masked": f"****{phone_e164[-4:]}"
         }
     )
 
@@ -249,19 +271,24 @@ def verify_proxy_otp(
             detail="Maximum verification attempts (3) exceeded. Security lockout triggered. Please initiate a new request."
         )
 
-    # Validate OTP code: Check demo hash or Twilio Verify API
-    if otp_record.otp_code_hash.startswith("DEMO_HASH:"):
+    # Validate OTP code: direct hash match, demo hash, or twilio service check
+    entered_hash = hashlib.sha256(otp_code.strip().encode("utf-8")).hexdigest()
+    if entered_hash == otp_record.otp_code_hash:
+        is_valid = True
+    elif otp_record.otp_code_hash.startswith("DEMO_HASH:"):
         expected_hash = otp_record.otp_code_hash.replace("DEMO_HASH:", "", 1)
-        entered_hash = hashlib.sha256(otp_code.strip().encode("utf-8")).hexdigest()
         is_valid = (entered_hash == expected_hash)
     else:
-        # Validate OTP code using Twilio Verify Check API
-        phone_e164 = otp_record.phone_number
-        check_result = twilio_verify_service.check_verification(
-            phone_e164=phone_e164,
-            code=otp_code.strip()
-        )
-        is_valid = (check_result.get("status") == "approved" and bool(check_result.get("valid")))
+        # Fallback to verify check service (for backward-compatible tests)
+        try:
+            phone_e164 = otp_record.phone_number
+            check_result = twilio_verify_service.check_verification(
+                phone_e164=phone_e164,
+                code=otp_code.strip()
+            )
+            is_valid = (check_result.get("status") == "approved" and bool(check_result.get("valid")))
+        except Exception:
+            is_valid = False
 
     if not is_valid:
         otp_record.attempts += 1

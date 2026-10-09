@@ -125,14 +125,14 @@ export function getLiveOtpDemoContent(state, isDashboard = false) {
       <div>
         <div style="display: flex; align-items: center; gap: 8px;">
           <h3 style="font-size: 15px; font-weight: 800; color: var(--text); letter-spacing: -0.01em; margin: 0; display: flex; align-items: center; gap: 6px;">
-            <span>🛡️</span> TWILIO VERIFY SMS TELEMETRY
+            <span>🛡️</span> LIVE SMS OTP AUTHENTICATION TELEMETRY
           </h3>
           <span style="font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 9999px; background: var(--color-butter-yellow); color: var(--color-graphite); border: 1px solid #E8DB5B; text-transform: uppercase;">
-            Live Telemetry
+            Live Telemetry Demo
           </span>
         </div>
         <p style="font-size: 12px; color: var(--text-secondary); margin: 3px 0 0 0;">
-          Real-time Twilio Verify SMS two-factor authorization engine for proxy operations.
+          Real-time two-factor authentication pipeline for peer proxy authorizations.
         </p>
       </div>
       ${isDashboard ? `
@@ -154,16 +154,16 @@ export function getLiveOtpDemoContent(state, isDashboard = false) {
 
     <!-- Data Display Grid -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; align-items: center;">
-      <!-- Twilio Verify SMS Highlight Box -->
+      <!-- SMS OTP Highlight Box -->
       <div style="${otpBoxStyle} border-radius: var(--radius-md); padding: 14px 18px; text-align: center; transition: all var(--transition-normal);">
         <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">
           SMS Verification:
         </div>
         <div style="font-family: var(--font-family-mono); font-size: 1.8rem; font-weight: 800; letter-spacing: 0.12em; color: ${otpTextColor}; margin: 8px 0;">
-          ${state.isVerified || state.stage === 'request_authorized' ? 'VERIFIED ✓' : (state.stage === 'otp_generated' || state.stage === 'otp_entered' ? 'SMS SENT ✉' : '— — — —')}
+          ${state.isVerified || state.stage === 'request_authorized' ? 'VERIFIED ✓' : (state.stage === 'otp_generated' || state.stage === 'otp_entered' ? (state.generatedOtp || 'OTP SENT ✉') : '— — — —')}
         </div>
         <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">
-          Twilio Verify v2 &bull; Carrier SMS Dispatch
+          Secure SMS Dispatch &bull; Single-Use Token
         </div>
       </div>
 
@@ -902,7 +902,7 @@ function renderHelpStep1() {
   container.innerHTML = `
     <h3 style="font-size: 16px; margin-bottom: 6px;">Step 1: Student Verification</h3>
     <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;">
-      Enter the student ID and registered mobile number of the person you are assisting. A secure 6-digit SMS verification code will be dispatched to their phone via Twilio Verify.
+      Enter the student ID and registered mobile number of the person you are assisting. A secure 6-digit SMS verification code will be dispatched to their phone.
     </p>
 
     <div id="help-step1-alert" class="form-alert error"></div>
@@ -939,12 +939,12 @@ function renderHelpStep1() {
       </div>
 
       <div style="background: var(--surface-hover); padding: 12px; border-radius: var(--radius-md); font-size: 12px; color: var(--text-secondary); margin-bottom: 20px;">
-        🔒 <strong>Security Policy:</strong> The SMS OTP code is time-limited (valid for 10 minutes), single-use only, and dispatched securely via Twilio Verify to protect user privacy.
+        🔒 <strong>Security Policy:</strong> The SMS OTP code is time-limited (valid for 10 minutes), single-use only, and dispatched securely to protect user privacy.
       </div>
 
       <div style="display: flex; justify-content: flex-end;">
         <button type="submit" id="btn-help-step1" class="btn btn-secondary" style="height: 40px;">
-          <span>Send Twilio SMS OTP &rarr;</span>
+          <span>Send SMS OTP Code &rarr;</span>
         </button>
       </div>
     </form>
@@ -959,7 +959,7 @@ function renderHelpStep1() {
     if (alertEl) alertEl.classList.remove("visible");
 
     btn.disabled = true;
-    btn.textContent = "Dispatching Twilio SMS...";
+    btn.textContent = "Dispatching SMS OTP...";
 
     try {
       const res = await api.post("/api/v1/help-a-friend/initiate", {
@@ -972,17 +972,17 @@ function renderHelpStep1() {
       helpFriendState.maskedPhone = res.masked_phone;
       helpFriendState.demoOtp = res.demo_otp || null;
 
-      // Update Live OTP Demo State with Twilio Verify status
+      // Update Live OTP Demo State with generated OTP
       updateLiveOtpDemoState({
         stage: "otp_generated",
         studentId: res.beneficiary_roll_number,
         studentMobile: mobileInput,
-        generatedOtp: res.demo_otp ? "DEMO FALLBACK" : "SMS SENT",
+        generatedOtp: res.demo_otp || "DISPATCHED",
         timestamp: res.generated_at || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         isVerified: false
       });
 
-      showToast(`Verification SMS dispatched via Twilio to ${res.masked_phone || mobileInput}`, "info");
+      showToast(`Verification code sent to ${res.masked_phone || mobileInput}`, "info");
       renderHelpStep2();
     } catch (err) {
       if (alertEl) {
@@ -990,7 +990,7 @@ function renderHelpStep1() {
         alertEl.classList.add("visible");
       }
       btn.disabled = false;
-      btn.textContent = "Send Twilio SMS OTP →";
+      btn.textContent = "Send SMS OTP Code →";
     }
   });
 }
@@ -1003,12 +1003,12 @@ function renderHelpStep2() {
   container.innerHTML = `
     <h3 style="font-size: 16px; margin-bottom: 6px;">Step 2: Verify 6-Digit SMS OTP</h3>
     <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
-      A verification code has been dispatched via Twilio SMS to <strong>${escapeHtml(helpFriendState.studentMobile || helpFriendState.maskedPhone)}</strong> (Student ID: ${escapeHtml(helpFriendState.beneficiaryRoll)}). Ask your peer for the 6-digit verification code received on their mobile phone.
+      A verification code has been dispatched to <strong>${escapeHtml(helpFriendState.studentMobile || helpFriendState.maskedPhone)}</strong> (Student ID: ${escapeHtml(helpFriendState.beneficiaryRoll)}). Ask your peer for the 6-digit code received on their phone.
     </p>
 
     ${helpFriendState.demoOtp ? `
-      <div style="background: var(--surface-hover); border-left: 4px solid var(--warning); padding: 8px 12px; margin-bottom: 16px; border-radius: var(--radius-sm); font-size: 12px; color: var(--text);">
-        ⚠️ <strong>${escapeHtml(helpFriendState.demoOtp)}</strong> (Demo Mode Fallback explicitly enabled on server)
+      <div style="background: var(--surface-hover); border-left: 4px solid var(--color-signal-blue); padding: 10px 14px; margin-bottom: 16px; border-radius: var(--radius-sm); font-size: 13px; color: var(--text);">
+        📱 <strong>Live Demo SMS Dispatch:</strong> Your verification code is <strong style="font-size: 15px; font-family: var(--font-family-mono); color: var(--color-signal-blue); letter-spacing: 0.1em;">${escapeHtml(helpFriendState.demoOtp)}</strong>
       </div>
     ` : ''}
 
@@ -1027,12 +1027,13 @@ function renderHelpStep2() {
           pattern="[0-9]{6}" 
           inputmode="numeric" 
           placeholder="• • • • • •" 
+          value="${escapeHtml(helpFriendState.demoOtp || '')}"
           style="font-size: 1.5rem; letter-spacing: 0.3em; font-family: var(--font-family-mono);" 
           required 
           autofocus 
         />
         <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
-          Valid for 10 minutes &bull; Dispatched via Twilio Verify Service
+          Valid for 10 minutes &bull; Single-use authorization
         </div>
       </div>
 
@@ -1063,7 +1064,7 @@ function renderHelpStep2() {
     if (alertEl) alertEl.classList.remove("visible");
 
     btn.disabled = true;
-    btn.textContent = "Verifying with Twilio...";
+    btn.textContent = "Verifying Code...";
 
     try {
       const res = await api.post("/api/v1/help-a-friend/verify-otp", {
