@@ -1,18 +1,20 @@
 import uuid
-import random
 import hashlib
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from app.models.user import Student
+from sqlalchemy import or_, func
+from app.models.user import Student, User
 from app.models.complaint import Complaint
 from app.models.proxy_request import OTPVerification, ProxyRequest
 from app.schemas.complaint import ComplaintCreate
 from app.services.complaint_service import create_complaint
 from app.utils.audit_logger import create_audit_log
 from app.utils.notifier import send_mock_sms
+from app.services.twilio_verify_service import twilio_verify_service, normalize_to_e164
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -28,20 +30,50 @@ def _ensure_utc(dt: datetime) -> Optional[datetime]:
 def initiate_proxy_otp(
     db: Session,
     proxy_student: Student,
-    beneficiary_roll_number: str
+    beneficiary_roll_number: str,
+    student_mobile_number: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Step 1 & 2: Student A initiates a proxy submission on behalf of peer Student B.
-    Generates a 6-digit numeric OTP, hashes it with SHA-256, and dispatches via SMS.
+    Validates Student ID and registered Student Mobile Number.
+    Dispatches SMS verification code via official Twilio Verify v2 Service.
     """
     clean_roll = beneficiary_roll_number.strip()
-    beneficiary = db.query(Student).filter(Student.roll_number == clean_roll).first()
+    candidates = (
+        db.query(Student)
+        .join(Student.user)
+        .filter(
+            or_(
+                func.upper(Student.roll_number) == clean_roll.upper(),
+                func.upper(Student.university_reg_number) == clean_roll.upper(),
+                User.phone_number == clean_roll,
+                func.upper(User.email) == clean_roll.upper()
+            )
+        )
+        .all()
+    )
 
-    if not beneficiary:
+    if not candidates:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Beneficiary student with roll number '{clean_roll}' not found."
+            detail=f"Beneficiary student with roll number or registration number '{clean_roll}' not found."
         )
+
+    # Disambiguate if multiple candidates match
+    beneficiary = candidates[0]
+    if student_mobile_number and len(candidates) > 1:
+        try:
+            cand_entered_e164 = normalize_to_e164(student_mobile_number)
+            for cand in candidates:
+                if cand.user.phone_number:
+                    try:
+                        if normalize_to_e164(cand.user.phone_number) == cand_entered_e164:
+                            beneficiary = cand
+                            break
+                    except ValueError:
+                        pass
+        except ValueError:
+            pass
 
     phone = beneficiary.user.phone_number
     if not phone:
@@ -50,17 +82,75 @@ def initiate_proxy_otp(
             detail="Beneficiary student does not have a registered contact phone number."
         )
 
-    # Generate 6-digit numeric OTP
-    otp_code = f"{random.randint(100000, 999999)}"
-    otp_hash = hashlib.sha256(otp_code.encode("utf-8")).hexdigest()
+    # Normalize beneficiary registered phone number to strict E.164 format
+    try:
+        phone_e164 = normalize_to_e164(phone)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Beneficiary student registered phone number is invalid: {str(e)}"
+        )
 
-    # 5-minute strict lifespan
-    expires = datetime.now(timezone.utc) + timedelta(minutes=5)
+    # Validate entered mobile number against beneficiary's registered mobile number if provided
+    if student_mobile_number:
+        try:
+            entered_e164 = normalize_to_e164(student_mobile_number)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The entered mobile number is not in a valid phone number format."
+            )
+
+        if entered_e164 != phone_e164:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"The entered mobile number does not match the registered contact number for student ID '{clean_roll}'."
+            )
+
+    now_utc = datetime.now(timezone.utc)
+
+    # Anti-abuse cooldown: Enforce 60-second limit between OTP requests for same beneficiary
+    recent_otp = db.query(OTPVerification).filter(
+        OTPVerification.beneficiary_student_id == beneficiary.id,
+        OTPVerification.is_verified == False
+    ).order_by(OTPVerification.created_at.desc()).first()
+
+    if recent_otp and recent_otp.created_at:
+        elapsed = (now_utc - _ensure_utc(recent_otp.created_at)).total_seconds()
+        if elapsed < 60:
+            remaining_cooldown = int(60 - elapsed)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Rate limit exceeded. Please wait {remaining_cooldown} second(s) before requesting another verification code."
+            )
+
+    # Dispatch SMS verification via Twilio Verify API
+    demo_otp_val: Optional[str] = None
+    verification_sid = ""
+
+    try:
+        verification = twilio_verify_service.start_verification(phone_e164=phone_e164, channel="sms")
+        verification_sid = verification.get("sid", "")
+        sid_hash = hashlib.sha256(verification_sid.encode("utf-8")).hexdigest()
+    except Exception as e:
+        # Check if demo fallback is explicitly enabled in non-production environments
+        if getattr(settings, "ENABLE_DEMO_OTP_FALLBACK", False) and settings.ENVIRONMENT.strip().lower() != "production":
+            demo_code = "482910"
+            sid_hash = "DEMO_HASH:" + hashlib.sha256(demo_code.encode("utf-8")).hexdigest()
+            demo_otp_val = f"DEMO_FALLBACK_OTP: {demo_code}"
+            verification_sid = "DEMO_FALLBACK_SID"
+            logger.warning(f"[Demo Fallback] Real SMS dispatch unavailable ({e}). Using explicitly enabled demo OTP fallback: {demo_otp_val}")
+        else:
+            raise e
+
+    # Store verification metadata in OTPVerification
+    # Store cryptographic SHA-256 hash of the verification SID (never plaintext OTP)
+    expires = now_utc + timedelta(minutes=10)
 
     otp_record = OTPVerification(
         beneficiary_student_id=beneficiary.id,
-        phone_number=phone,
-        otp_code_hash=otp_hash,
+        phone_number=phone_e164,
+        otp_code_hash=sid_hash,
         purpose="HELP_A_FRIEND",
         expires_at=expires,
         attempts=0,
@@ -69,23 +159,17 @@ def initiate_proxy_otp(
     db.add(otp_record)
     db.flush()
 
-    # Dispatch prototype SMS to Student B's basic phone
-    sms_body = f"CampusFLow proxy verification code: {otp_code}. Valid for 5 minutes. Share with your peer to lodge request."
-    send_mock_sms(
-        db=db,
-        phone_number=phone,
-        message=sms_body,
-        trigger_event="OTP_DISPATCH",
-        student_id=beneficiary.id
-    )
-
     create_audit_log(
         db=db,
         actor_id=proxy_student.id,
         entity_type="OTP_PROXY",
         entity_id=otp_record.id,
         action="OTP_INITIATE",
-        new_state={"beneficiary_id": str(beneficiary.id), "phone_masked": f"****{phone[-4:]}"}
+        new_state={
+            "beneficiary_id": str(beneficiary.id),
+            "phone_masked": f"****{phone_e164[-4:]}",
+            "verification_sid": verification_sid
+        }
     )
 
     db.commit()
@@ -93,8 +177,12 @@ def initiate_proxy_otp(
     return {
         "status": "OTP_SENT",
         "beneficiary_roll_number": clean_roll,
-        "masked_phone": f"****{phone[-4:]}",
-        "expires_in_seconds": 300
+        "masked_phone": f"****{phone_e164[-4:]}",
+        "expires_in_seconds": 600,
+        "demo_otp": demo_otp_val,
+        "demo_fallback": bool(demo_otp_val is not None),
+        "student_mobile": student_mobile_number or phone_e164,
+        "generated_at": now_utc.strftime("%I:%M:%S %p")
     }
 
 
@@ -105,21 +193,35 @@ def verify_proxy_otp(
     otp_code: str
 ) -> OTPVerification:
     """
-    Step 3: Verify the 6-digit numeric OTP provided by Student B.
-    Enforces 5-minute expiry, max 3 attempts, and single-use validation.
+    Step 3: Verify the 6-digit numeric OTP provided by Student B using Twilio Verify Check API.
+    Enforces expiry, max 3 attempts, and single-use validation.
     """
     clean_roll = beneficiary_roll_number.strip()
-    beneficiary = db.query(Student).filter(Student.roll_number == clean_roll).first()
+    candidates = (
+        db.query(Student)
+        .join(Student.user)
+        .filter(
+            or_(
+                func.upper(Student.roll_number) == clean_roll.upper(),
+                func.upper(Student.university_reg_number) == clean_roll.upper(),
+                User.phone_number == clean_roll,
+                func.upper(User.email) == clean_roll.upper()
+            )
+        )
+        .all()
+    )
 
-    if not beneficiary:
+    if not candidates:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Beneficiary student '{clean_roll}' not found."
         )
 
+    candidate_ids = [c.id for c in candidates]
+
     # Retrieve most recent unverified OTP record
     otp_record = db.query(OTPVerification).filter(
-        OTPVerification.beneficiary_student_id == beneficiary.id,
+        OTPVerification.beneficiary_student_id.in_(candidate_ids),
         OTPVerification.is_verified == False
     ).order_by(OTPVerification.created_at.desc()).first()
 
@@ -129,13 +231,15 @@ def verify_proxy_otp(
             detail="No active pending OTP request found for this student. Please initiate request first."
         )
 
+    beneficiary = otp_record.beneficiary
+
     now = datetime.now(timezone.utc)
 
     # Expiration check
     if now > _ensure_utc(otp_record.expires_at):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="OTP code has expired (exceeded 5 minutes). Please request a fresh code."
+            detail="OTP verification code has expired. Please initiate a fresh request."
         )
 
     # Rate limiting: Maximum 3 attempts
@@ -145,13 +249,24 @@ def verify_proxy_otp(
             detail="Maximum verification attempts (3) exceeded. Security lockout triggered. Please initiate a new request."
         )
 
-    # Compare SHA-256 hash
-    submitted_hash = hashlib.sha256(otp_code.strip().encode("utf-8")).hexdigest()
+    # Validate OTP code: Check demo hash or Twilio Verify API
+    if otp_record.otp_code_hash.startswith("DEMO_HASH:"):
+        expected_hash = otp_record.otp_code_hash.replace("DEMO_HASH:", "", 1)
+        entered_hash = hashlib.sha256(otp_code.strip().encode("utf-8")).hexdigest()
+        is_valid = (entered_hash == expected_hash)
+    else:
+        # Validate OTP code using Twilio Verify Check API
+        phone_e164 = otp_record.phone_number
+        check_result = twilio_verify_service.check_verification(
+            phone_e164=phone_e164,
+            code=otp_code.strip()
+        )
+        is_valid = (check_result.get("status") == "approved" and bool(check_result.get("valid")))
 
-    if submitted_hash != otp_record.otp_code_hash:
+    if not is_valid:
         otp_record.attempts += 1
         db.commit()
-        remaining = 3 - otp_record.attempts
+        remaining = max(0, 3 - otp_record.attempts)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid OTP code. {remaining} attempt(s) remaining."

@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from app.models.user import User, Student, UserRole
 from app.models.gate_pass import (
     GatePass, GatePassQRToken, GatePassType, GatePassStatus,
@@ -34,6 +35,13 @@ def create_gate_pass(
     """
     Student submits an institutional gate pass application.
     """
+    acc_type = (student.accommodation_type or "").strip().upper() if student else ""
+    if acc_type != "HOSTELER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Gate pass is available only to hostel residents."
+        )
+
     pass_num = f"GP-{datetime.now().year}-{uuid.uuid4().hex[:6].upper()}"
 
     gate_pass = GatePass(
@@ -209,17 +217,49 @@ def verify_and_consume_qr(
     Security Guard scans single-use QR token at perimeter gate.
     Row-level locking guarantees token can never be reused.
     """
-    # Query with row-level lock if supported by dialect
-    query = db.query(GatePassQRToken).filter(GatePassQRToken.qr_token == qr_token_str)
+    cleaned_input = qr_token_str.strip()
+    query = db.query(GatePassQRToken).filter(GatePassQRToken.qr_token == cleaned_input)
     if db.bind and db.bind.dialect.name != "sqlite":
         query = query.with_for_update()
 
     token = query.first()
 
+    # Manual fallback: Look up by human-readable pass number (e.g. GP-2026-0001) or PIN code
+    if not token:
+        gp_match = db.query(GatePass).filter(
+            (func.upper(GatePass.pass_number) == cleaned_input.upper()) |
+            (GatePass.pin_code == cleaned_input)
+        ).first()
+
+        if gp_match:
+            if gp_match.decision_status != DecisionStatus.APPROVED:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Gate pass {gp_match.pass_number} is {gp_match.decision_status.value}. Only APPROVED passes can be verified for exit."
+                )
+            if gp_match.status == GatePassStatus.REJECTED:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Gate pass {gp_match.pass_number} has been rejected."
+                )
+            if gp_match.status == GatePassStatus.CHECKED_OUT:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"REPLAY ATTEMPT DETECTED: Gate pass {gp_match.pass_number} is already checked out."
+                )
+            if gp_match.status == GatePassStatus.COMPLETED:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Gate pass {gp_match.pass_number} has already completed return check-in."
+                )
+            token = db.query(GatePassQRToken).filter(
+                GatePassQRToken.gate_pass_id == gp_match.id
+            ).first()
+
     if not token:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Invalid QR token: Pass not found in system"
+            detail="Invalid QR token or Pass Identifier: Pass not found in system"
         )
 
     # Replay protection: if already used, reject immediately
@@ -265,7 +305,9 @@ def verify_and_consume_qr(
 
     return {
         "status": "APPROVED",
+        "action": "CHECK_OUT",
         "message": "Valid gate pass. Exit permitted.",
+        "pass_id": str(gp.id),
         "pass_number": gp.pass_number,
         "student_id": str(gp.student_id),
         "actual_out_time": now.isoformat()

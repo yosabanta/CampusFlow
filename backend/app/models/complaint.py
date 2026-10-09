@@ -75,6 +75,23 @@ class Complaint(Base):
         "ComplaintAttachment", back_populates="complaint", cascade="all, delete-orphan"
     )
 
+    @property
+    def student_name(self) -> Optional[str]:
+        if self.student and self.student.user:
+            return f"{self.student.user.first_name} {self.student.user.last_name}".strip()
+        return None
+
+    @property
+    def student_roll(self) -> Optional[str]:
+        return self.student.roll_number if self.student else None
+
+    @property
+    def assigned_staff_name(self) -> Optional[str]:
+        if self.assigned_staff:
+            return f"{self.assigned_staff.first_name} {self.assigned_staff.last_name}".strip()
+        return None
+
+
 
 class ComplaintAttachment(Base):
     """

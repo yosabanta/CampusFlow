@@ -51,7 +51,7 @@ export async function loadNoticeBoard() {
   }
 }
 
-let noticeBoardExpanded = true;
+let noticeBoardExpanded = false;
 
 export function renderNoticeBoard(notices = []) {
   const container = document.getElementById("notice-board-container");
@@ -73,21 +73,38 @@ export function renderNoticeBoard(notices = []) {
     return;
   }
 
+  // Sort notices by priority: CANCELLED/URGENT first, then RESCHEDULED/ROOM_CHANGED, then others
+  const priorityWeight = (type = "") => {
+    const t = type.toUpperCase();
+    if (t === "CANCELLED" || t === "URGENT") return 1;
+    if (t === "RESCHEDULED" || t === "ROOM_CHANGED") return 2;
+    if (t === "ANNOUNCEMENT") return 3;
+    return 4;
+  };
+
+  const sortedNotices = [...notices].sort((a, b) => priorityWeight(a.notice_type) - priorityWeight(b.notice_type));
+  const topNotice = sortedNotices[0];
+  const topTypeClass = (topNotice?.notice_type || '').toLowerCase();
+  const topTypeBadge = formatNoticeTypeBadge(topNotice?.notice_type);
+
   container.innerHTML = `
     <div class="notice-board-header">
       <div class="notice-board-title-group">
         <span class="notice-board-badge">📢 CAMPUS & ACADEMIC NOTICES (${count})</span>
-        <span style="font-size: 12px; color: var(--text-secondary);">Important updates for your cohort</span>
+        <span class="notice-top-preview" style="font-size: 12px; color: #FFFFFF; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+          ${topTypeBadge}
+          <span style="max-width: 480px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(topNotice?.subject || 'Campus Alert')}</span>
+        </span>
       </div>
       <div class="notice-board-controls">
         <button id="btn-refresh-notices" class="btn-notice-toggle" type="button" title="Refresh">↻ Refresh</button>
         <button id="btn-toggle-notices" class="btn-notice-toggle" type="button" aria-expanded="${noticeBoardExpanded}">
-          ${noticeBoardExpanded ? '▲ Minimize' : '▼ View All'}
+          ${noticeBoardExpanded ? '▲ Minimize' : `▼ View All (${count})`}
         </button>
       </div>
     </div>
     <div id="notice-carousel-list" class="notice-carousel" style="display: ${noticeBoardExpanded ? 'flex' : 'none'};">
-      ${notices.map(notice => {
+      ${sortedNotices.map(notice => {
         const typeClass = (notice.notice_type || '').toLowerCase();
         const typeBadge = formatNoticeTypeBadge(notice.notice_type);
         return `
@@ -117,7 +134,7 @@ export function renderNoticeBoard(notices = []) {
     const toggleBtn = document.getElementById("btn-toggle-notices");
     if (list) list.style.display = noticeBoardExpanded ? 'flex' : 'none';
     if (toggleBtn) {
-      toggleBtn.innerHTML = noticeBoardExpanded ? '▲ Minimize' : '▼ View All';
+      toggleBtn.innerHTML = noticeBoardExpanded ? '▲ Minimize' : `▼ View All (${count})`;
       toggleBtn.setAttribute("aria-expanded", String(noticeBoardExpanded));
     }
   });
@@ -126,11 +143,11 @@ export function renderNoticeBoard(notices = []) {
 function formatNoticeTypeBadge(type) {
   switch (type) {
     case "CANCELLED":
-      return `<span class="status-badge rejected">✕ Cancelled</span>`;
+      return `<span class="status-badge special">✕ Cancelled</span>`;
     case "RESCHEDULED":
       return `<span class="status-badge pending">◷ Rescheduled</span>`;
     case "ROOM_CHANGED":
-      return `<span class="status-badge warning">⇄ Room Changed</span>`;
+      return `<span class="status-badge important">⇄ Room Changed</span>`;
     case "SWITCHED":
       return `<span class="status-badge info">⇄ Switched</span>`;
     case "POSTPONED":
@@ -262,19 +279,32 @@ export function renderNavigation(role) {
 
 function getNavItemsForRole(role) {
   switch (role) {
-    case "STUDENT":
-      return [
+    case "STUDENT": {
+      const state = store.getState();
+      const currentUser = state.user;
+      const accType = (currentUser?.student_profile?.accommodation_type || "").trim().toUpperCase();
+      const isHosteler = accType === "HOSTELER";
+
+      const items = [
         { label: "Dashboard", route: "#dashboard", icon: "📊" },
         { label: "Notices", route: "#class-notices", icon: "📢" },
         { label: "Attendance", route: "#attendance", icon: "📝" },
-        { label: "Complaints", route: "#complaints", icon: "🛠️" },
-        { label: "Gate Pass", route: "#gatepasses", icon: "🎫" },
-        { label: "Help a Friend", route: "#help-a-friend", icon: "🤝" },
+        { label: "Complaints", route: "#complaints", icon: "🛠️" }
+      ];
+
+      if (isHosteler) {
+        items.push({ label: "Gate Pass", route: "#gatepasses", icon: "🎫" });
+      }
+
+      items.push(
+        { label: "Request on Behalf", route: "#help-a-friend", icon: "🤝" },
         { label: "Documents", route: "#documents", icon: "📄" },
         { label: "Study Materials", route: "#materials", icon: "📚" },
         { label: "Notifications", route: "#notifications", icon: "🔔" },
         { label: "Profile", route: "#profile", icon: "👤" }
-      ];
+      );
+      return items;
+    }
 
     case "ADMIN":
       return [

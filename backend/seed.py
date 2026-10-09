@@ -180,18 +180,20 @@ def seed_demo_users(db: Session) -> dict:
 
             if "student_profile" in account:
                 sp = account["student_profile"]
+                acc_type = sp.get("accommodation_type") or ("HOSTELER" if sp.get("hostel_id") or sp.get("room_number") else "DAY_SCHOLAR")
                 student = Student(
                     id=user.id,
                     roll_number=sp["roll_number"],
+                    accommodation_type=acc_type,
                     department=sp["department"],
                     batch_year=sp["batch_year"],
                     semester=sp["semester"],
                     section=sp["section"],
-                    hostel_id=sp["hostel_id"],
-                    room_number=sp["room_number"],
-                    dues_cleared=sp["dues_cleared"],
-                    has_smartphone=sp["has_smartphone"],
-                    parent_phone=sp["parent_phone"]
+                    hostel_id=sp.get("hostel_id"),
+                    room_number=sp.get("room_number"),
+                    dues_cleared=sp.get("dues_cleared", True),
+                    has_smartphone=sp.get("has_smartphone", True),
+                    parent_phone=sp.get("parent_phone")
                 )
                 db.add(student)
 
@@ -856,7 +858,12 @@ def reset_and_seed_database(target_engine=None, session_factory=None):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="CampusFLow Demo Database Seeder")
+    parser = argparse.ArgumentParser(description="CampusFlow Demo Database Seeder (TESTING ONLY)")
+    parser.add_argument(
+        "--confirm-seed-demo-data",
+        action="store_true",
+        help="Explicit confirmation required to seed demo records into a test database."
+    )
     parser.add_argument(
         "--reset",
         action="store_true",
@@ -866,9 +873,16 @@ if __name__ == "__main__":
         "--db-url",
         type=str,
         default=None,
-        help="Target database URL (e.g. sqlite:///campusflow_demo.db or postgresql://...)"
+        help="Target database URL (e.g. sqlite:///campusflow_test_sandbox.db)"
     )
     args = parser.parse_args()
+
+    if not args.confirm_seed_demo_data:
+        logger.error(
+            "ACCIDENTAL SEED PREVENTION: Normal operation does not permit unconfirmed seeding. "
+            "To seed an isolated test/demo sandbox, you must explicitly pass '--confirm-seed-demo-data'."
+        )
+        sys.exit(1)
 
     active_engine = engine
     active_session_maker = SessionLocal
@@ -888,4 +902,5 @@ if __name__ == "__main__":
         with active_session_maker() as session:
             demo_users = seed_demo_users(session)
             seed_cross_module_data(session, demo_users)
+
 

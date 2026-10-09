@@ -1,5 +1,6 @@
 import os
 import uuid
+from unittest.mock import patch
 import pytest
 from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
@@ -241,39 +242,36 @@ def test_journey_2_gate_pass_and_single_use_qr(client):
 
 def test_journey_3_help_a_friend_proxy_flow(client):
     """
-    STUDENT A -> HELP A FRIEND -> BENEFICIARY RESOLUTION -> OTP DISPATCH -> VERIFY -> PROXY COMPLAINT
+    STUDENT A -> HELP A FRIEND -> BENEFICIARY RESOLUTION -> TWILIO OTP DISPATCH -> VERIFY -> PROXY COMPLAINT
     """
     student_a_token = get_token(client, "priya.sharma@bput.ac.in")
 
-    # Step 1: Student A initiates request for Student B (Sanjay Soren, roll 2201019)
-    init_resp = client.post(
-        "/api/v1/help-a-friend/initiate",
-        json={"beneficiary_roll_number": "2201019"},
-        headers={"Authorization": f"Bearer {student_a_token}"}
-    )
-    assert init_resp.status_code == 200
-    assert init_resp.json()["status"] == "OTP_SENT"
-    assert init_resp.json()["beneficiary_roll_number"] == "2201019"
+    # Step 1: Student A initiates request for Student B (Sanjay Soren, roll 2201019) via Twilio Verify
+    with patch("app.services.proxy_service.twilio_verify_service.start_verification") as mock_start:
+        mock_start.return_value = {"sid": "VExxxJourney3", "status": "pending", "to": "+919876544102"}
+        init_resp = client.post(
+            "/api/v1/help-a-friend/initiate",
+            json={"beneficiary_roll_number": "2201019"},
+            headers={"Authorization": f"Bearer {student_a_token}"}
+        )
+        assert init_resp.status_code == 200
+        assert init_resp.json()["status"] == "OTP_SENT"
+        assert init_resp.json()["beneficiary_roll_number"] == "2201019"
+        assert init_resp.json()["demo_otp"] is None
 
-    # Step 2: Retrieve the dispatched mock OTP from prototype SMS ledger
-    db = TestingSessionLocal()
-    from app.models.notification import SMSNotification
-    sms = db.query(SMSNotification).filter(SMSNotification.trigger_event == "OTP_DISPATCH").order_by(SMSNotification.dispatched_at.desc()).first()
-    import re
-    otp_code = re.search(r"\b(\d{6})\b", sms.message_body).group(1)
-    db.close()
-
-    # Step 3: Student A verifies OTP
-    verify_resp = client.post(
-        "/api/v1/help-a-friend/verify-otp",
-        json={
-            "beneficiary_roll_number": "2201019",
-            "otp_code": otp_code
-        },
-        headers={"Authorization": f"Bearer {student_a_token}"}
-    )
-    assert verify_resp.status_code == 200
-    otp_ver_id = verify_resp.json()["otp_verification_id"]
+    # Step 2 & 3: Student A verifies Twilio OTP received by Student B
+    with patch("app.services.proxy_service.twilio_verify_service.check_verification") as mock_check:
+        mock_check.return_value = {"sid": "VExxxJourney3", "status": "approved", "valid": True}
+        verify_resp = client.post(
+            "/api/v1/help-a-friend/verify-otp",
+            json={
+                "beneficiary_roll_number": "2201019",
+                "otp_code": "123456"
+            },
+            headers={"Authorization": f"Bearer {student_a_token}"}
+        )
+        assert verify_resp.status_code == 200
+        otp_ver_id = verify_resp.json()["otp_verification_id"]
 
     # Step 4: Student A submits proxy complaint on behalf of Student B
     submit_resp = client.post(

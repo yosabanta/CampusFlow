@@ -153,7 +153,8 @@ def get_student_attendance_summary(
     late_cnt = sum(1 for r in records if r.status == AttendanceStatus.LATE)
 
     # Standard percentage calculation: (PRESENT + LATE) / total * 100 or PRESENT / total * 100
-    percentage = round(((present_cnt + late_cnt) / total) * 100.0, 2) if total > 0 else 100.0
+    percentage = round(((present_cnt + late_cnt) / total) * 100.0, 2) if total > 0 else 0.0
+    is_shortage = (percentage < 75.0) if total > 0 else False
 
     return StudentAttendanceSummary(
         student_id=student_id,
@@ -162,5 +163,49 @@ def get_student_attendance_summary(
         absent_count=absent_cnt,
         late_count=late_cnt,
         attendance_percentage=percentage,
+        is_shortage=is_shortage,
         records=records
     )
+
+
+def get_teacher_sessions(
+    db: Session,
+    teacher: User
+) -> List[AttendanceSession]:
+    """Retrieve attendance sessions conducted by teacher, or all sessions if admin."""
+    query = db.query(AttendanceSession)
+    if teacher.role == UserRole.TEACHER:
+        query = query.filter(AttendanceSession.teacher_id == teacher.id)
+    return query.order_by(AttendanceSession.session_date.desc()).all()
+
+
+def get_cohort_roster(
+    db: Session,
+    branch: Optional[str] = None,
+    batch_year: Optional[int] = None,
+    section: Optional[str] = None
+) -> List[dict]:
+    """Retrieve enrolled students matching the cohort parameters from the database."""
+    query = db.query(Student)
+    if branch:
+        query = query.filter(Student.department.ilike(f"%{branch.strip()}%"))
+    if batch_year:
+        query = query.filter(Student.batch_year == batch_year)
+    if section:
+        query = query.filter(Student.section.ilike(section.strip()))
+
+    students = query.all()
+    results = []
+    for s in students:
+        u = s.user
+        name = f"{u.first_name} {u.last_name}".strip() if u else s.roll_number
+        results.append({
+            "id": s.id,
+            "name": name,
+            "roll": s.roll_number,
+            "branch": s.department,
+            "batch": s.batch_year,
+            "sec": s.section
+        })
+    return results
+

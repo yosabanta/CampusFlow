@@ -31,6 +31,27 @@ export async function login(username, password) {
   return user;
 }
 
+export async function demoLogin(role, username) {
+  // 1. Submit to demo-login endpoint
+  const tokenResponse = await api.post("/api/v1/auth/demo-login", {
+    role: role || undefined,
+    username: username || undefined
+  });
+
+  const accessToken = tokenResponse.access_token;
+  if (!accessToken) {
+    throw new Error("Demo login failed: No access token received.");
+  }
+
+  // 2. Store JWT in reactive state and localStorage
+  store.setState({ token: accessToken });
+
+  // 3. Immediately fetch verified user profile
+  const user = await fetchCurrentUser();
+
+  return user;
+}
+
 export async function fetchCurrentUser() {
   const token = store.getState().token;
   if (!token) return null;
@@ -77,4 +98,8 @@ export function getCurrentUser() {
 
 export function getCurrentRole() {
   return store.getState().role;
+}
+
+export async function registerStudent(data) {
+  return await api.post("/api/v1/auth/register", data);
 }

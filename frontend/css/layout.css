@@ -17,7 +17,7 @@
 .app-header {
   height: var(--header-height);
   background-color: var(--surface);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 2px solid #E5DCF5;
   position: sticky;
   top: 0;
   z-index: var(--z-header);
@@ -25,7 +25,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--space-4);
-  box-shadow: var(--shadow-xs);
+  box-shadow: 0 2px 10px rgba(58, 12, 163, 0.05);
   transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
@@ -93,14 +93,14 @@
   width: 34px;
   height: 34px;
   border-radius: var(--radius-md);
-  background: var(--primary);
+  background: linear-gradient(135deg, var(--color-signal-blue) 0%, var(--color-ultra-violet) 100%);
   color: #FFFFFF;
   font-weight: var(--font-bold);
   font-size: var(--text-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 4px rgba(0, 87, 255, 0.25);
+  box-shadow: 0 2px 8px rgba(106, 0, 244, 0.35);
 }
 
 .brand-name {
@@ -113,11 +113,16 @@
 .brand-tag {
   font-size: var(--text-xs);
   padding: 2px 6px;
-  background-color: var(--primary-subtle);
-  color: var(--primary-text);
+  background-color: rgba(106, 0, 244, 0.1);
+  color: var(--color-ultra-violet);
   border-radius: var(--radius-full);
   font-weight: var(--font-semibold);
   margin-left: var(--space-1);
+}
+
+[data-theme="dark"] .brand-tag {
+  background-color: rgba(182, 255, 46, 0.14);
+  color: var(--color-lime-spark);
 }
 
 /* Dynamic Greeting Chip */
@@ -140,12 +145,13 @@
    2. INSTITUTION & CAMPUS NOTICE BOARD (MANDATORY: IMMEDIATELY BELOW HEADER)
    -------------------------------------------------------------------------- */
 .notice-board-banner {
-  background-color: var(--surface-elevated);
-  border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, #1A1329 0%, var(--color-graphite) 100%);
+  border-bottom: 2px solid rgba(106, 0, 244, 0.3);
   padding: var(--space-2) var(--space-4);
   position: relative;
   z-index: var(--z-notice);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-porcelain);
   transition: all var(--transition-fast);
 }
 
@@ -167,20 +173,21 @@
   gap: var(--space-2);
   font-size: var(--text-sm);
   font-weight: var(--font-semibold);
-  color: var(--text);
+  color: var(--color-porcelain);
 }
 
 .notice-board-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  background-color: var(--warning-bg);
-  border: 1px solid var(--warning-border);
-  color: var(--warning-text);
+  padding: 3px 10px;
+  background-color: var(--color-butter-yellow);
+  border: 1px solid #E8DB5B;
+  color: var(--color-graphite);
   border-radius: var(--radius-full);
   font-size: var(--text-xs);
   font-weight: var(--font-bold);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 .notice-board-controls {
@@ -190,10 +197,12 @@
 }
 
 .btn-notice-toggle {
-  background: transparent;
-  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--color-porcelain);
   font-size: var(--text-xs);
-  padding: 4px 8px;
+  font-weight: var(--font-medium);
+  padding: 4px 10px;
   border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
@@ -202,8 +211,8 @@
 }
 
 .btn-notice-toggle:hover {
-  background-color: var(--surface-hover);
-  color: var(--text);
+  background-color: rgba(255, 255, 255, 0.18);
+  color: #FFFFFF;
 }
 
 .notice-carousel {
@@ -219,24 +228,32 @@
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
-  background-color: var(--surface-hover);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--primary);
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 4px solid var(--color-signal-blue);
   border-radius: var(--radius-sm);
   font-size: var(--text-xs);
+  color: var(--color-porcelain);
 }
 
 .notice-item.urgent {
-  border-left-color: var(--error);
-  background-color: var(--error-bg);
+  border-left-color: var(--color-dragonfruit);
+  background-color: rgba(255, 70, 150, 0.12);
 }
 
 .notice-item.cancelled {
-  border-left-color: var(--error);
+  border-left-color: var(--color-dragonfruit);
+  background-color: rgba(255, 70, 150, 0.08);
 }
 
 .notice-item.room_changed, .notice-item.rescheduled {
-  border-left-color: var(--warning);
+  border-left-color: var(--color-butter-yellow);
+  background-color: rgba(255, 242, 117, 0.08);
+}
+
+.notice-item.info, .notice-item.switched {
+  border-left-color: var(--color-ultra-violet);
+  background-color: rgba(106, 0, 244, 0.08);
 }
 
 .notice-content {
@@ -245,14 +262,14 @@
 
 .notice-title {
   font-weight: var(--font-bold);
-  color: var(--text);
+  color: #FFFFFF;
   display: flex;
   align-items: center;
   gap: var(--space-2);
 }
 
 .notice-details {
-  color: var(--text-secondary);
+  color: #D1D5E0;
   margin-top: 2px;
 }
 
@@ -261,7 +278,7 @@
   align-items: center;
   gap: var(--space-2);
   white-space: nowrap;
-  color: var(--text-muted);
+  color: #A3A8B8;
   font-size: var(--text-xs);
 }
 
@@ -298,21 +315,24 @@
   overflow: hidden;
 }
 
-/* Sidebar Navigation */
+/* Sidebar Navigation (Graphite #23262F & Night Violet #1E1033) */
 .app-sidebar {
   width: var(--sidebar-width);
-  background-color: var(--surface);
-  border-right: 1px solid var(--border);
+  background-color: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
+  color: var(--sidebar-text);
   display: flex;
   flex-direction: column;
   transition: transform var(--transition-normal), width var(--transition-normal);
   z-index: var(--z-sidebar);
   flex-shrink: 0;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
 }
 
 .sidebar-header {
   padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--sidebar-header-bg);
+  border-bottom: 1px solid var(--sidebar-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -320,14 +340,15 @@
 
 .sidebar-role-badge {
   font-size: var(--text-xs);
-  font-weight: var(--font-semibold);
-  padding: 3px 8px;
+  font-weight: var(--font-bold);
+  padding: 3px 9px;
   border-radius: var(--radius-sm);
-  background-color: var(--primary-subtle);
-  color: var(--primary-text);
+  background-color: var(--color-lime-spark);
+  color: var(--color-graphite);
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  box-shadow: 0 0 10px rgba(182, 255, 46, 0.35);
 }
 
 .sidebar-nav {
@@ -340,8 +361,8 @@
   font-size: 0.7rem;
   font-weight: var(--font-bold);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  color: var(--sidebar-text-muted);
   padding: var(--space-2) var(--space-3);
   margin-top: var(--space-2);
 }
@@ -356,25 +377,27 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
+  padding: 9px var(--space-3);
   border-radius: var(--radius-md);
-  color: var(--text-secondary);
+  color: var(--sidebar-text-muted);
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition: all var(--transition-fast);
   text-decoration: none;
 }
 
 .nav-link:hover {
-  background-color: var(--surface-hover);
-  color: var(--text);
+  background-color: var(--sidebar-hover);
+  color: #FFFFFF;
   text-decoration: none;
+  transform: translateX(2px);
 }
 
 .nav-link.active {
-  background-color: var(--primary-subtle);
-  color: var(--primary);
+  background: var(--sidebar-active-bg);
+  color: #FFFFFF;
   font-weight: var(--font-semibold);
+  box-shadow: 0 4px 12px rgba(106, 0, 244, 0.35);
 }
 
 .nav-link-icon {
@@ -388,22 +411,23 @@
 .nav-link-badge {
   margin-left: auto;
   font-size: var(--text-xs);
-  padding: 1px 6px;
+  padding: 2px 7px;
   border-radius: var(--radius-full);
-  background-color: var(--border);
-  color: var(--text-secondary);
+  background-color: rgba(255, 255, 255, 0.12);
+  color: var(--sidebar-text);
 }
 
 .nav-link.active .nav-link-badge {
-  background-color: var(--primary);
+  background-color: rgba(255, 255, 255, 0.25);
   color: #FFFFFF;
 }
 
 .sidebar-footer {
   padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--border-subtle);
+  background-color: var(--sidebar-header-bg);
+  border-top: 1px solid var(--sidebar-border);
   font-size: var(--text-xs);
-  color: var(--text-muted);
+  color: var(--sidebar-text-muted);
   display: flex;
   align-items: center;
   justify-content: space-between;

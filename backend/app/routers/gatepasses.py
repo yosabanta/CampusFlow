@@ -33,6 +33,12 @@ def apply_gate_pass(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User account lacks an active student profile."
         )
+    acc_type = (student.accommodation_type or "").strip().upper()
+    if acc_type != "HOSTELER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Gate pass is available only to hostel residents."
+        )
     return gate_pass_service.create_gate_pass(db=db, student=student, data=payload)
 
 

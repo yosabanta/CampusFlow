@@ -19,6 +19,7 @@ class Hostel(Base):
         Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     total_rooms: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    allocation: Mapped[Optional[str]] = mapped_column(String(20), default="Boys", nullable=True)
 
     # Relationships
     warden: Mapped[Optional["User"]] = relationship("User", foreign_keys=[warden_id])

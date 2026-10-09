@@ -10,24 +10,221 @@ import { showToast } from "./ui.js";
 import { escapeHtml, formatDate, formatDateTime, timeAgo, getGreeting } from "./utils.js";
 
 /* ==========================================================================
+   LIVE OTP AUTHENTICATION DEMO STATE & RENDER ENGINE
+   ========================================================================== */
+function getStoredLiveOtpState() {
+  try {
+    const raw = sessionStorage.getItem("cf_live_otp_demo");
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return {
+    stage: "waiting_input",
+    studentId: "",
+    studentMobile: "",
+    generatedOtp: "",
+    timestamp: "",
+    isVerified: false,
+    ticketNumber: ""
+  };
+}
+
+let liveOtpDemoState = getStoredLiveOtpState();
+
+export function updateLiveOtpDemoState(partial) {
+  liveOtpDemoState = { ...liveOtpDemoState, ...partial };
+  try {
+    sessionStorage.setItem("cf_live_otp_demo", JSON.stringify(liveOtpDemoState));
+  } catch (e) {}
+  const panels = document.querySelectorAll(".live-otp-demo-panel-content");
+  panels.forEach(p => {
+    const isDashboard = p.getAttribute("data-is-dashboard") === "true";
+    p.innerHTML = getLiveOtpDemoContent(liveOtpDemoState, isDashboard);
+  });
+}
+
+export function getLiveOtpDemoContent(state, isDashboard = false) {
+  const STAGES = [
+    { key: "waiting_input", num: 1, label: "Waiting for mobile number" },
+    { key: "otp_generated", num: 2, label: "OTP generated" },
+    { key: "otp_entered", num: 3, label: "OTP entered" },
+    { key: "otp_verified", num: 4, label: "OTP verified" },
+    { key: "request_authorized", num: 5, label: "Request authorized" }
+  ];
+
+  const stageOrder = ["waiting_input", "otp_generated", "otp_entered", "otp_verified", "request_authorized"];
+  const currentIdx = stageOrder.indexOf(state.stage);
+
+  // Semantic Status Badge mapped to exact stage colors
+  let statusBadge = "";
+  if (state.stage === "request_authorized") {
+    statusBadge = `<span class="status-badge" style="background: var(--color-lime-spark); color: var(--color-graphite); border: 1px solid #9FE814; font-weight: 800; padding: 4px 10px; box-shadow: 0 0 10px rgba(182, 255, 46, 0.45);">⚡ Request Authorized (${escapeHtml(state.ticketNumber || 'CMP-PROXY')})</span>`;
+  } else if (state.isVerified || state.stage === "otp_verified") {
+    statusBadge = `<span class="status-badge" style="background: var(--color-champagne); color: var(--color-emerald-ink); border: 1px solid var(--color-emerald-ink); font-weight: 800; padding: 4px 10px;">✓ OTP Verified</span>`;
+  } else if (state.stage === "otp_entered") {
+    statusBadge = `<span class="status-badge" style="background: rgba(106, 0, 244, 0.14); color: var(--color-ultra-violet); border: 1px solid var(--color-ultra-violet); font-weight: 800; padding: 4px 10px;">⟳ OTP Entered (Validating...)</span>`;
+  } else if (state.stage === "otp_generated") {
+    statusBadge = `<span class="status-badge" style="background: rgba(0, 87, 255, 0.12); color: var(--color-signal-blue); border: 1px solid var(--color-signal-blue); font-weight: 800; padding: 4px 10px;">✓ OTP Generated</span>`;
+  } else {
+    statusBadge = `<span class="status-badge neutral" style="background: rgba(35, 38, 47, 0.08); color: var(--color-graphite); border: 1px solid var(--border); font-weight: 700; padding: 4px 10px;">Waiting for mobile number</span>`;
+  }
+
+  // Stepper pill indicators mapped to exact stage palette:
+  // 1: Waiting -> neutral Graphite/Porcelain
+  // 2: OTP Generated -> Signal Blue #0057FF
+  // 3: OTP Entered -> Ultra Violet #6A00F4
+  // 4: OTP Verified -> Emerald Ink #064E3B (with Champagne)
+  // 5: Request Authorized -> Lime Spark #B6FF2E
+  const stepperHtml = STAGES.map((s, idx) => {
+    let style = "background: var(--surface-hover); color: var(--text-muted); border: 1px solid var(--border);";
+    let icon = s.num;
+
+    if (idx < currentIdx || (idx <= 3 && state.isVerified)) {
+      icon = "✓";
+      style = "background: var(--color-champagne); color: var(--color-emerald-ink); border: 1px solid rgba(6, 78, 59, 0.35); font-weight: 700;";
+    } else if (idx === currentIdx) {
+      if (s.key === "waiting_input") {
+        style = "background: var(--color-graphite); color: var(--color-porcelain); border: 1px solid var(--color-graphite); font-weight: 700;";
+      } else if (s.key === "otp_generated") {
+        style = "background: var(--color-signal-blue); color: #FFFFFF; border: 1px solid var(--color-signal-blue); font-weight: 700; box-shadow: 0 0 10px rgba(0, 87, 255, 0.4);";
+      } else if (s.key === "otp_entered") {
+        style = "background: var(--color-ultra-violet); color: #FFFFFF; border: 1px solid var(--color-ultra-violet); font-weight: 700; box-shadow: 0 0 10px rgba(106, 0, 244, 0.4);";
+      } else if (s.key === "otp_verified") {
+        style = "background: var(--color-emerald-ink); color: #FFFFFF; border: 1px solid var(--color-emerald-ink); font-weight: 700; box-shadow: 0 0 10px rgba(6, 78, 59, 0.4);";
+      } else if (s.key === "request_authorized") {
+        style = "background: var(--color-lime-spark); color: var(--color-graphite); border: 1px solid var(--color-lime-spark); font-weight: 800; box-shadow: 0 0 12px rgba(182, 255, 46, 0.6);";
+      }
+    }
+
+    return `
+      <div style="display: flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 9999px; font-size: 11px; white-space: nowrap; ${style}">
+        <span style="font-weight: 800; font-size: 10px;">${icon}</span>
+        <span>${escapeHtml(s.label)}</span>
+      </div>
+    `;
+  }).join('<span style="color: var(--border); font-size: 11px;">&rarr;</span>');
+
+  // Dynamic OTP Display Box styling depending on stage
+  let otpBoxStyle = "background: var(--surface); border: 1px solid var(--border);";
+  let otpTextColor = "var(--text-muted)";
+  if (state.stage === "request_authorized") {
+    otpBoxStyle = "background: linear-gradient(135deg, var(--color-champagne) 0%, rgba(182, 255, 46, 0.25) 100%); border: 2px solid var(--color-emerald-ink); box-shadow: 0 0 12px rgba(182, 255, 46, 0.4);";
+    otpTextColor = "var(--color-emerald-ink)";
+  } else if (state.isVerified || state.stage === "otp_verified") {
+    otpBoxStyle = "background: var(--color-champagne); border: 2px solid var(--color-emerald-ink); box-shadow: 0 0 10px rgba(6, 78, 59, 0.25);";
+    otpTextColor = "var(--color-emerald-ink)";
+  } else if (state.stage === "otp_entered") {
+    otpBoxStyle = "background: rgba(106, 0, 244, 0.04); border: 2px solid var(--color-ultra-violet); box-shadow: 0 0 10px rgba(106, 0, 244, 0.2);";
+    otpTextColor = "var(--color-ultra-violet)";
+  } else if (state.stage === "otp_generated") {
+    otpBoxStyle = "background: rgba(0, 87, 255, 0.04); border: 2px solid var(--color-signal-blue); box-shadow: 0 0 10px rgba(0, 87, 255, 0.25);";
+    otpTextColor = "var(--color-signal-blue)";
+  }
+
+  return `
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <h3 style="font-size: 15px; font-weight: 800; color: var(--text); letter-spacing: -0.01em; margin: 0; display: flex; align-items: center; gap: 6px;">
+            <span>🛡️</span> TWILIO VERIFY SMS TELEMETRY
+          </h3>
+          <span style="font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 9999px; background: var(--color-butter-yellow); color: var(--color-graphite); border: 1px solid #E8DB5B; text-transform: uppercase;">
+            Live Telemetry
+          </span>
+        </div>
+        <p style="font-size: 12px; color: var(--text-secondary); margin: 3px 0 0 0;">
+          Real-time Twilio Verify SMS two-factor authorization engine for proxy operations.
+        </p>
+      </div>
+      ${isDashboard ? `
+        <a href="#help-a-friend" class="btn btn-sm btn-primary" style="font-size: 12px; height: 32px;">
+          Open Request on Behalf &rarr;
+        </a>
+      ` : ''}
+    </div>
+
+    <!-- Visual status indicators (5 stages) -->
+    <div style="margin: 12px 0 14px 0; padding: 10px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+      <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">
+        Authentication Pipeline:
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px; overflow-x: auto; padding-bottom: 2px;">
+        ${stepperHtml}
+      </div>
+    </div>
+
+    <!-- Data Display Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; align-items: center;">
+      <!-- Twilio Verify SMS Highlight Box -->
+      <div style="${otpBoxStyle} border-radius: var(--radius-md); padding: 14px 18px; text-align: center; transition: all var(--transition-normal);">
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">
+          SMS Verification:
+        </div>
+        <div style="font-family: var(--font-family-mono); font-size: 1.8rem; font-weight: 800; letter-spacing: 0.12em; color: ${otpTextColor}; margin: 8px 0;">
+          ${state.isVerified || state.stage === 'request_authorized' ? 'VERIFIED ✓' : (state.stage === 'otp_generated' || state.stage === 'otp_entered' ? 'SMS SENT ✉' : '— — — —')}
+        </div>
+        <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">
+          Twilio Verify v2 &bull; Carrier SMS Dispatch
+        </div>
+      </div>
+
+      <!-- Metadata & Verification Status Details -->
+      <div style="font-size: 13px; line-height: 1.8;">
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border); padding-bottom: 4px; margin-bottom: 4px;">
+          <span style="color: var(--text-muted);">Student ID:</span>
+          <strong style="font-family: var(--font-family-mono); color: var(--text);">${escapeHtml(state.studentId || '—')}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border); padding-bottom: 4px; margin-bottom: 4px;">
+          <span style="color: var(--text-muted);">Student Mobile:</span>
+          <strong style="font-family: var(--font-family-mono); color: var(--text);">${escapeHtml(state.studentMobile || 'Waiting for mobile number')}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border); padding-bottom: 4px; margin-bottom: 4px;">
+          <span style="color: var(--text-muted);">Status:</span>
+          <span>${statusBadge}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border); padding-bottom: 4px; margin-bottom: 4px;">
+          <span style="color: var(--text-muted);">Dispatched:</span>
+          <strong style="font-family: var(--font-family-mono); color: var(--text);">${escapeHtml(state.timestamp || '—')}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+          <span style="color: var(--text-muted);">Verification Status:</span>
+          ${state.isVerified ? `
+            <span style="display: inline-block; padding: 3px 12px; background: var(--color-champagne); color: var(--color-emerald-ink); border: 1px solid var(--color-emerald-ink); border-radius: 9999px; font-weight: 800; font-size: 12px;">
+              [ OTP Verified ✓ ]
+            </span>
+          ` : `
+            <span style="display: inline-block; padding: 3px 12px; background: rgba(35, 38, 47, 0.08); color: var(--text-muted); border: 1px solid var(--border); border-radius: 9999px; font-weight: 600; font-size: 12px;">
+              [ Pending Verification ]
+            </span>
+          `}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ==========================================================================
    1. STUDENT DASHBOARD
    ========================================================================== */
 export async function renderStudentDashboard(mainEl, user) {
   if (!mainEl) return;
 
-  // Initial loading layout
+  const accType = (user?.student_profile?.accommodation_type || "").trim().toUpperCase();
+  const isHosteler = accType === "HOSTELER";
+
+  // Initial loading layout with rich 60/20/10/10 palette harmony
   mainEl.innerHTML = `
-    <div class="card" style="background: linear-gradient(135deg, var(--surface), var(--surface-hover)); border-left: 4px solid var(--primary);">
+    <!-- Hero Banner (Graphite #23262F & Night Violet #1E1033 with Signal Blue accent) -->
+    <div class="card card-graphite" style="background: linear-gradient(135deg, var(--color-graphite) 0%, var(--color-night-violet) 100%); border-left: 5px solid var(--color-signal-blue); box-shadow: var(--shadow-md);">
       <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
         <div>
-          <h2 style="font-size: 1.35rem; color: var(--text);">${escapeHtml(getGreeting(user.first_name))} 👋</h2>
-          <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--text-secondary);">
-            Student &bull; <strong style="color: var(--text);">${escapeHtml(user.student_profile?.department || 'Engineering')}</strong> &bull; 
+          <h2 style="font-size: 1.35rem; color: #FFFFFF;">${escapeHtml(getGreeting(user.first_name))} 👋</h2>
+          <p style="margin: 4px 0 0 0; font-size: 13px; color: #CBD2DE;">
+            Student &bull; <strong style="color: #FFFFFF;">${escapeHtml(user.student_profile?.department || 'Engineering')}</strong> &bull; 
             Sem ${user.student_profile?.semester || 6}, Sec ${user.student_profile?.section || 'A'}
           </p>
         </div>
         <div style="display: flex; gap: 8px;">
-          <a href="#gatepasses" class="btn btn-sm btn-primary">+ Apply Gate Pass</a>
+          ${isHosteler ? `<a href="#gatepasses" class="btn btn-sm btn-primary" id="btn-hero-gatepass">+ Apply Gate Pass</a>` : ''}
           <a href="#complaints" class="btn btn-sm btn-secondary">+ New Complaint</a>
         </div>
       </div>
@@ -38,28 +235,30 @@ export async function renderStudentDashboard(mainEl, user) {
       <h3 style="font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 10px;">⚡ Quick Actions</h3>
       <div class="quick-actions-grid">
         <a href="#complaints" class="quick-action-card" id="qa-complaint">
-          <div class="quick-action-icon">🛠️</div>
+          <div class="quick-action-icon accent-apricot">🛠️</div>
           <div>
             <div class="quick-action-title">Lodge Complaint</div>
             <div class="quick-action-desc">Report hostel, room or lab issue</div>
           </div>
         </a>
+        ${isHosteler ? `
         <a href="#gatepasses" class="quick-action-card" id="qa-gatepass">
-          <div class="quick-action-icon">🎫</div>
+          <div class="quick-action-icon accent-blue">🎫</div>
           <div>
             <div class="quick-action-title">Apply Gate Pass</div>
             <div class="quick-action-desc">Local outing & leave requests</div>
           </div>
         </a>
+        ` : ''}
         <a href="#help-a-friend" class="quick-action-card" id="qa-help-friend">
-          <div class="quick-action-icon">🤝</div>
+          <div class="quick-action-icon accent-lime">🤝</div>
           <div>
-            <div class="quick-action-title">Help a Friend</div>
+            <div class="quick-action-title">Request on Behalf</div>
             <div class="quick-action-desc">Emergency proxy with SMS OTP</div>
           </div>
         </a>
         <a href="#documents" class="quick-action-card" id="qa-documents">
-          <div class="quick-action-icon">📄</div>
+          <div class="quick-action-icon accent-champagne">📄</div>
           <div>
             <div class="quick-action-title">Request Document</div>
             <div class="quick-action-desc">Bonafide & clearance certificates</div>
@@ -68,32 +267,46 @@ export async function renderStudentDashboard(mainEl, user) {
       </div>
     </div>
 
-    <!-- Telemetry Cards Grid -->
+    <!-- Live OTP Authentication Demo Section (Integrated into Student Dashboard) -->
+    <div class="card" id="dashboard-live-otp-demo" style="margin-top: 24px; border: 1px solid var(--border); border-top: 4px solid var(--color-ultra-violet); background: var(--surface); box-shadow: var(--shadow-sm);">
+      <div class="live-otp-demo-panel-content" data-is-dashboard="true">
+        ${getLiveOtpDemoContent(liveOtpDemoState, true)}
+      </div>
+    </div>
+
+    <!-- Telemetry Cards Grid (Diverse Card Palette) -->
     <div id="student-telemetry-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 24px;">
-      <div class="card" style="padding: 16px;">
-        <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Attendance Summary</div>
-        <div id="stat-attendance" style="font-size: 1.75rem; font-weight: 800; color: var(--primary); margin: 6px 0;">—</div>
+      <!-- Attendance Summary: Champagne + Emerald Ink -->
+      <div class="card card-champagne" style="padding: 16px; border-left: 4px solid var(--color-emerald-ink);">
+        <div style="font-size: 11px; font-weight: 700; color: var(--color-emerald-ink); text-transform: uppercase;">Attendance Summary</div>
+        <div id="stat-attendance" style="font-size: 1.75rem; font-weight: 800; color: var(--color-emerald-ink); margin: 6px 0;">—</div>
         <div id="stat-attendance-sub" style="font-size: 11px; color: var(--text-secondary);">Loading lecture summary...</div>
       </div>
-      <div class="card" style="padding: 16px;">
-        <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Active Complaints</div>
-        <div id="stat-complaints" style="font-size: 1.75rem; font-weight: 800; color: var(--warning); margin: 6px 0;">—</div>
+      <!-- Active Complaints: Soft Apricot + Graphite -->
+      <div class="card card-apricot" style="padding: 16px; border-left: 4px solid var(--color-graphite);">
+        <div style="font-size: 11px; font-weight: 700; color: var(--color-graphite); text-transform: uppercase;">Active Complaints</div>
+        <div id="stat-complaints" style="font-size: 1.75rem; font-weight: 800; color: var(--color-graphite); margin: 6px 0;">—</div>
         <div id="stat-complaints-sub" style="font-size: 11px; color: var(--text-secondary);">Loading tickets...</div>
       </div>
-      <div class="card" style="padding: 16px;">
-        <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Gate Pass Status</div>
-        <div id="stat-gatepass" style="font-size: 1.25rem; font-weight: 700; color: var(--text); margin: 8px 0;">—</div>
+      ${isHosteler ? `
+      <!-- Gate Pass Status: Porcelain + Ultra Violet -->
+      <div class="card card-porcelain" style="padding: 16px; border-left: 4px solid var(--color-ultra-violet);">
+        <div style="font-size: 11px; font-weight: 700; color: var(--color-ultra-violet); text-transform: uppercase;">Gate Pass Status</div>
+        <div id="stat-gatepass" style="font-size: 1.25rem; font-weight: 700; color: var(--color-ultra-violet); margin: 8px 0;">—</div>
         <div id="stat-gatepass-sub" style="font-size: 11px; color: var(--text-secondary);">Checking active passes...</div>
       </div>
-      <div class="card" style="padding: 16px;">
-        <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Unread Notifications</div>
-        <div id="stat-notifications" style="font-size: 1.75rem; font-weight: 800; color: var(--error); margin: 6px 0;">—</div>
+      ` : ''}
+      <!-- Unread Notifications: Surface + Dragonfruit -->
+      <div class="card" style="padding: 16px; border-left: 4px solid var(--color-dragonfruit);">
+        <div style="font-size: 11px; font-weight: 700; color: var(--color-dragonfruit); text-transform: uppercase;">Unread Notifications</div>
+        <div id="stat-notifications" style="font-size: 1.75rem; font-weight: 800; color: var(--color-dragonfruit); margin: 6px 0;">—</div>
         <div id="stat-notifications-sub" style="font-size: 11px; color: var(--text-secondary);">Checking unread updates...</div>
       </div>
     </div>
 
     <!-- Live Content Dashboard Sections -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-top: 24px;">
+      ${isHosteler ? `
       <!-- Active Gate Pass Card -->
       <div class="card" id="dashboard-active-gatepass-card">
         <div class="card-header">
@@ -104,6 +317,7 @@ export async function renderStudentDashboard(mainEl, user) {
           <div class="state-container" style="padding: 24px;"><div class="spinner"></div></div>
         </div>
       </div>
+      ` : ''}
 
       <!-- Recent Complaints Card -->
       <div class="card" id="dashboard-recent-complaints-card">
@@ -155,28 +369,33 @@ async function loadStudentDashboardData() {
     document.getElementById("stat-complaints-sub")?.replaceChildren(document.createTextNode("Failed to load complaints"));
   }
 
-  // 3. Gate Passes
-  try {
-    const passes = await api.get("/api/v1/gatepasses");
-    const activePass = passes.find(p => ["PENDING", "APPROVED"].includes(p.status));
-    const passStatEl = document.getElementById("stat-gatepass");
-    const passSubEl = document.getElementById("stat-gatepass-sub");
+  // 3. Gate Passes (Hostel residents only)
+  const currentUser = store.getState().user;
+  const isHosteler = (currentUser?.student_profile?.accommodation_type || "").trim().toUpperCase() === "HOSTELER";
 
-    if (passStatEl) {
-      if (activePass) {
-        passStatEl.innerHTML = formatStatusBadge(activePass.status);
-      } else {
-        passStatEl.textContent = "No Active Pass";
+  if (isHosteler) {
+    try {
+      const passes = await api.get("/api/v1/gatepasses");
+      const activePass = passes.find(p => ["PENDING", "APPROVED"].includes(p.status));
+      const passStatEl = document.getElementById("stat-gatepass");
+      const passSubEl = document.getElementById("stat-gatepass-sub");
+
+      if (passStatEl) {
+        if (activePass) {
+          passStatEl.innerHTML = formatStatusBadge(activePass.status);
+        } else {
+          passStatEl.textContent = "No Active Pass";
+        }
       }
-    }
-    if (passSubEl) {
-      passSubEl.textContent = activePass ? `To: ${activePass.destination}` : "You can apply for local outing or leave";
-    }
+      if (passSubEl) {
+        passSubEl.textContent = activePass ? `To: ${activePass.destination}` : "You can apply for local outing or leave";
+      }
 
-    renderDashboardGatePassSnippet(activePass);
-  } catch (err) {
-    document.getElementById("stat-gatepass")?.replaceChildren(document.createTextNode("—"));
-    document.getElementById("stat-gatepass-sub")?.replaceChildren(document.createTextNode("Failed to load gate pass"));
+      renderDashboardGatePassSnippet(activePass);
+    } catch (err) {
+      document.getElementById("stat-gatepass")?.replaceChildren(document.createTextNode("—"));
+      document.getElementById("stat-gatepass-sub")?.replaceChildren(document.createTextNode("Failed to load gate pass"));
+    }
   }
 
   // 4. Notifications
@@ -291,7 +510,7 @@ export async function renderStudentComplaints(mainEl) {
           Report facility issues with SLA-backed tracking and direct staff assignment.
         </p>
       </div>
-      <button id="btn-open-complaint-modal" class="btn btn-primary" type="button">
+      <button id="btn-open-complaint-modal" class="btn btn-secondary" type="button">
         + Lodge New Complaint
       </button>
     </div>
@@ -359,16 +578,25 @@ async function loadComplaintsList(filter = "ALL") {
 
     container.innerHTML = `
       <div style="display: flex; flex-direction: column; gap: 12px;">
-        ${displayList.map(c => `
-          <div class="card" style="padding: 16px; transition: transform var(--transition-fast);">
+        ${displayList.map(c => {
+          let cardClass = "card-status-normal";
+          if (c.priority === 'URGENT') {
+            cardClass = "card-status-urgent";
+          } else if (c.status === 'RESOLVED' || c.status === 'COMPLETED') {
+            cardClass = "card-status-resolved";
+          } else if (c.status === 'PENDING' || c.status === 'OPEN' || c.status === 'ASSIGNED') {
+            cardClass = "card-status-pending";
+          }
+          return `
+          <div class="card ${cardClass}" style="padding: 16px; transition: transform var(--transition-fast);">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
               <div>
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                  <span style="font-family: var(--font-family-mono); font-weight: 700; font-size: 12px; color: var(--primary);">
+                  <span style="font-family: var(--font-family-mono); font-weight: 700; font-size: 12px; color: var(--color-signal-blue);">
                     ${escapeHtml(c.ticket_number)}
                   </span>
                   <span class="status-badge info" style="font-size: 10px;">${escapeHtml(c.category_id || 'GENERAL')}</span>
-                  ${c.priority === 'URGENT' ? '<span class="status-badge rejected" style="font-size: 10px;">⚡ URGENT</span>' : ''}
+                  ${c.priority === 'URGENT' ? '<span class="status-badge special" style="font-size: 10px;">⚡ URGENT</span>' : ''}
                 </div>
                 <h4 style="font-size: 15px; font-weight: 700; color: var(--text);">${escapeHtml(c.title)}</h4>
                 <p style="font-size: 13px; color: var(--text-secondary); margin: 4px 0 8px 0;">${escapeHtml(c.description)}</p>
@@ -382,11 +610,11 @@ async function loadComplaintsList(filter = "ALL") {
                 ${formatStatusBadge(c.status)}
                 ${(c.status === 'RESOLVED' || c.status === 'COMPLETED') ? `
                   ${c.rating ? `
-                    <div style="font-size: 12px; color: #F59E0B;">
+                    <div style="font-size: 12px; color: var(--color-butter-yellow); filter: drop-shadow(0 0 1px rgba(0,0,0,0.5));">
                       ${'★'.repeat(c.rating)}${'☆'.repeat(5 - c.rating)} (${c.rating}/5)
                     </div>
                   ` : `
-                    <button class="btn btn-sm btn-primary" onclick="window.rateComplaintPrompt('${escapeHtml(c.id)}', '${escapeHtml(c.ticket_number)}')" type="button">
+                    <button class="btn btn-sm btn-attention" onclick="window.rateComplaintPrompt('${escapeHtml(c.id)}', '${escapeHtml(c.ticket_number)}')" type="button">
                       Rate Resolution
                     </button>
                   `}
@@ -394,7 +622,7 @@ async function loadComplaintsList(filter = "ALL") {
               </div>
             </div>
           </div>
-        `).join("")}
+        `;}).join("")}
       </div>
     `;
   } catch (err) {
@@ -597,7 +825,7 @@ window.rateComplaintPrompt = function(complaintId, ticketNumber) {
 
 
 /* ==========================================================================
-   3. HELP A FRIEND (SPECIAL REQUIRED WORKFLOW — 3-STEP WIZARD)
+   3. REQUEST ON BEHALF / HELP A FRIEND (3-STEP WIZARD WITH LIVE OTP DEMO)
    ========================================================================== */
 export function renderStudentHelpAFriend(mainEl) {
   if (!mainEl) return;
@@ -605,7 +833,7 @@ export function renderStudentHelpAFriend(mainEl) {
   mainEl.innerHTML = `
     <div style="max-width: 680px; margin: 0 auto;">
       <div style="margin-bottom: 20px;">
-        <h2>🤝 Help-a-Friend Emergency Proxy System</h2>
+        <h2>🤝 Request on Behalf (Help-a-Friend)</h2>
         <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
           Lodge an emergency complaint or facility request on behalf of a peer who has a basic feature phone or lacks smartphone connectivity.
         </p>
@@ -633,6 +861,13 @@ export function renderStudentHelpAFriend(mainEl) {
 
       <!-- Dynamic Step Card Container -->
       <div class="card" id="help-step-content" style="padding: 28px;"></div>
+
+      <!-- Live OTP Authentication Demo Section (Integrated into Flow) -->
+      <div class="card" id="flow-live-otp-demo" style="margin-top: 24px; border: 1px solid var(--border); border-top: 4px solid var(--color-ultra-violet); background: var(--surface); box-shadow: var(--shadow-sm);">
+        <div class="live-otp-demo-panel-content" data-is-dashboard="false">
+          ${getLiveOtpDemoContent(liveOtpDemoState, false)}
+        </div>
+      </div>
     </div>
   `;
 
@@ -642,7 +877,9 @@ export function renderStudentHelpAFriend(mainEl) {
 
 let helpFriendState = {
   beneficiaryRoll: "",
+  studentMobile: "",
   maskedPhone: "",
+  demoOtp: "",
   otpVerificationId: null,
   complaintResult: null
 };
@@ -663,9 +900,9 @@ function renderHelpStep1() {
   if (!container) return;
 
   container.innerHTML = `
-    <h3 style="font-size: 16px; margin-bottom: 6px;">Step 1: Enter Beneficiary Student Identifier</h3>
+    <h3 style="font-size: 16px; margin-bottom: 6px;">Step 1: Student Verification</h3>
     <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;">
-      Provide your peer's institutional Roll Number or registered phone number. A secure 6-digit OTP will be dispatched via SMS to their registered device.
+      Enter the student ID and registered mobile number of the person you are assisting. A secure 6-digit SMS verification code will be dispatched to their phone via Twilio Verify.
     </p>
 
     <div id="help-step1-alert" class="form-alert error"></div>
@@ -673,26 +910,41 @@ function renderHelpStep1() {
     <form id="form-help-step1">
       <div class="form-group">
         <label class="form-label" for="beneficiary-roll">
-          Beneficiary Student Roll Number *
-          <span class="form-label-desc">e.g. 2201043 (Sanjay Soren)</span>
+          Student ID *
+          <span class="form-label-desc">College Roll No., University Reg. No., or Email</span>
         </label>
         <input 
           type="text" 
           id="beneficiary-roll" 
           class="form-input" 
-          placeholder="Enter roll number (e.g. 2201043)" 
-          value="${escapeHtml(helpFriendState.beneficiaryRoll || '2201043')}" 
+          placeholder="e.g. 33, 2501289157, or roll/reg no." 
+          value="${escapeHtml(helpFriendState.beneficiaryRoll || '')}" 
+          required 
+        />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="beneficiary-mobile">
+          Student Mobile Number *
+          <span class="form-label-desc">Enter the mobile number of the student who wants to submit the request</span>
+        </label>
+        <input 
+          type="tel" 
+          id="beneficiary-mobile" 
+          class="form-input" 
+          placeholder="e.g. 9876543210" 
+          value="${escapeHtml(helpFriendState.studentMobile || '')}" 
           required 
         />
       </div>
 
       <div style="background: var(--surface-hover); padding: 12px; border-radius: var(--radius-md); font-size: 12px; color: var(--text-secondary); margin-bottom: 20px;">
-        🔒 <strong>Security Policy:</strong> The OTP code is time-limited (valid for 5 minutes), single-use only, and requires the peer's explicit consent before any proxy record can be logged in the permanent audit trail.
+        🔒 <strong>Security Policy:</strong> The SMS OTP code is time-limited (valid for 10 minutes), single-use only, and dispatched securely via Twilio Verify to protect user privacy.
       </div>
 
       <div style="display: flex; justify-content: flex-end;">
-        <button type="submit" id="btn-help-step1" class="btn btn-primary" style="height: 40px;">
-          <span>Dispatch Verification OTP &rarr;</span>
+        <button type="submit" id="btn-help-step1" class="btn btn-secondary" style="height: 40px;">
+          <span>Send Twilio SMS OTP &rarr;</span>
         </button>
       </div>
     </form>
@@ -701,29 +953,44 @@ function renderHelpStep1() {
   document.getElementById("form-help-step1")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const rollInput = document.getElementById("beneficiary-roll").value.trim();
+    const mobileInput = document.getElementById("beneficiary-mobile").value.trim();
     const alertEl = document.getElementById("help-step1-alert");
     const btn = document.getElementById("btn-help-step1");
     if (alertEl) alertEl.classList.remove("visible");
 
     btn.disabled = true;
-    btn.textContent = "Dispatching OTP...";
+    btn.textContent = "Dispatching Twilio SMS...";
 
     try {
       const res = await api.post("/api/v1/help-a-friend/initiate", {
-        beneficiary_roll_number: rollInput
+        beneficiary_roll_number: rollInput,
+        student_mobile_number: mobileInput
       });
 
       helpFriendState.beneficiaryRoll = res.beneficiary_roll_number;
+      helpFriendState.studentMobile = mobileInput;
       helpFriendState.maskedPhone = res.masked_phone;
-      showToast(`Verification OTP dispatched to ${res.masked_phone}`, "info");
+      helpFriendState.demoOtp = res.demo_otp || null;
+
+      // Update Live OTP Demo State with Twilio Verify status
+      updateLiveOtpDemoState({
+        stage: "otp_generated",
+        studentId: res.beneficiary_roll_number,
+        studentMobile: mobileInput,
+        generatedOtp: res.demo_otp ? "DEMO FALLBACK" : "SMS SENT",
+        timestamp: res.generated_at || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        isVerified: false
+      });
+
+      showToast(`Verification SMS dispatched via Twilio to ${res.masked_phone || mobileInput}`, "info");
       renderHelpStep2();
     } catch (err) {
       if (alertEl) {
-        alertEl.textContent = err.message || "Failed to initiate Help-a-Friend proxy.";
+        alertEl.textContent = err.message || "Failed to initiate request on behalf.";
         alertEl.classList.add("visible");
       }
       btn.disabled = false;
-      btn.textContent = "Dispatch Verification OTP →";
+      btn.textContent = "Send Twilio SMS OTP →";
     }
   });
 }
@@ -736,15 +1003,21 @@ function renderHelpStep2() {
   container.innerHTML = `
     <h3 style="font-size: 16px; margin-bottom: 6px;">Step 2: Verify 6-Digit SMS OTP</h3>
     <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
-      A verification code has been dispatched to <strong>${escapeHtml(helpFriendState.maskedPhone)}</strong> (Roll: ${escapeHtml(helpFriendState.beneficiaryRoll)}). Ask your peer for the 6-digit numeric code.
+      A verification code has been dispatched via Twilio SMS to <strong>${escapeHtml(helpFriendState.studentMobile || helpFriendState.maskedPhone)}</strong> (Student ID: ${escapeHtml(helpFriendState.beneficiaryRoll)}). Ask your peer for the 6-digit verification code received on their mobile phone.
     </p>
+
+    ${helpFriendState.demoOtp ? `
+      <div style="background: var(--surface-hover); border-left: 4px solid var(--warning); padding: 8px 12px; margin-bottom: 16px; border-radius: var(--radius-sm); font-size: 12px; color: var(--text);">
+        ⚠️ <strong>${escapeHtml(helpFriendState.demoOtp)}</strong> (Demo Mode Fallback explicitly enabled on server)
+      </div>
+    ` : ''}
 
     <div id="help-step2-alert" class="form-alert error"></div>
 
     <form id="form-help-step2">
       <div class="form-group" style="max-width: 320px; margin: 0 auto 20px auto; text-align: center;">
         <label class="form-label" for="otp-code" style="justify-content: center; margin-bottom: 8px;">
-          Enter 6-Digit Numeric OTP Code *
+          Enter 6-Digit SMS OTP Code *
         </label>
         <input 
           type="text" 
@@ -759,18 +1032,26 @@ function renderHelpStep2() {
           autofocus 
         />
         <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
-          Valid for 5 minutes &bull; Prototype note: check terminal/console logs for generated OTP
+          Valid for 10 minutes &bull; Dispatched via Twilio Verify Service
         </div>
       </div>
 
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <button type="button" class="btn btn-outline" id="btn-back-step1">&larr; Change Roll Number</button>
-        <button type="submit" id="btn-help-step2" class="btn btn-primary" style="height: 40px;">
-          <span>Verify OTP Code &rarr;</span>
+        <button type="button" class="btn btn-outline" id="btn-back-step1">&larr; Change Details</button>
+        <button type="submit" id="btn-help-step2" class="btn btn-success" style="height: 40px;">
+          <span>Verify SMS Code &rarr;</span>
         </button>
       </div>
     </form>
   `;
+
+  // Status indicator updates when student enters/types OTP
+  const otpInput = document.getElementById("otp-code");
+  otpInput?.addEventListener("input", (e) => {
+    if (e.target.value.length > 0 && !liveOtpDemoState.isVerified) {
+      updateLiveOtpDemoState({ stage: "otp_entered" });
+    }
+  });
 
   document.getElementById("btn-back-step1")?.addEventListener("click", () => renderHelpStep1());
 
@@ -782,7 +1063,7 @@ function renderHelpStep2() {
     if (alertEl) alertEl.classList.remove("visible");
 
     btn.disabled = true;
-    btn.textContent = "Verifying...";
+    btn.textContent = "Verifying with Twilio...";
 
     try {
       const res = await api.post("/api/v1/help-a-friend/verify-otp", {
@@ -791,7 +1072,14 @@ function renderHelpStep2() {
       });
 
       helpFriendState.otpVerificationId = res.otp_verification_id;
-      showToast("OTP verified successfully! You are authorized to file on peer's behalf.", "success");
+
+      // Update Live OTP Demo State to Verified
+      updateLiveOtpDemoState({
+        stage: "otp_verified",
+        isVerified: true
+      });
+
+      showToast("OTP verified successfully! Request on Behalf authorized.", "success");
       renderHelpStep3();
     } catch (err) {
       if (alertEl) {
@@ -799,7 +1087,7 @@ function renderHelpStep2() {
         alertEl.classList.add("visible");
       }
       btn.disabled = false;
-      btn.textContent = "Verify OTP Code →";
+      btn.textContent = "Verify SMS Code →";
     }
   });
 }
@@ -812,7 +1100,7 @@ function renderHelpStep3() {
   container.innerHTML = `
     <h3 style="font-size: 16px; margin-bottom: 6px;">Step 3: Lodge Complaint on Behalf of Peer</h3>
     <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
-      Verified authorization active for beneficiary: <strong>${escapeHtml(helpFriendState.beneficiaryRoll)}</strong>. Enter the issue details below.
+      Verified authorization active for beneficiary: <strong>${escapeHtml(helpFriendState.beneficiaryRoll)}</strong> (${escapeHtml(helpFriendState.studentMobile)}). Enter the issue details below.
     </p>
 
     <div id="help-step3-alert" class="form-alert error"></div>
@@ -820,7 +1108,7 @@ function renderHelpStep3() {
     <form id="form-help-step3">
       <div class="form-group">
         <label class="form-label" for="proxy-comp-title">Complaint Title *</label>
-        <input type="text" id="proxy-comp-title" class="form-input" placeholder="e.g. Fan burning smell in Hostel C Room 102" required minlength="3" maxlength="150" />
+        <input type="text" id="proxy-comp-title" class="form-input" placeholder="e.g. Fan burning smell in Hostel B Room 108" required minlength="3" maxlength="150" />
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
@@ -858,7 +1146,7 @@ function renderHelpStep3() {
 
         <div class="form-group">
           <label class="form-label" for="proxy-comp-loc-details">Exact Location *</label>
-          <input type="text" id="proxy-comp-loc-details" class="form-input" placeholder="e.g. Hostel Block C, Room 102" required maxlength="120" />
+          <input type="text" id="proxy-comp-loc-details" class="form-input" placeholder="e.g. Hostel Block B, Room 108" required maxlength="120" />
         </div>
       </div>
 
@@ -900,6 +1188,13 @@ function renderHelpStep3() {
       });
 
       helpFriendState.complaintResult = result;
+
+      // Update Live OTP Demo State to Request Authorized
+      updateLiveOtpDemoState({
+        stage: "request_authorized",
+        ticketNumber: result.ticket_number
+      });
+
       showToast(`Proxy complaint lodged! Ticket #${result.ticket_number}`, "success");
       renderHelpStep4();
     } catch (err) {
@@ -927,7 +1222,7 @@ function renderHelpStep4() {
         Emergency Proxy Complaint Successfully Lodged!
       </h3>
       <p style="font-size: 13px; color: var(--text-secondary); max-width: 480px;">
-        The maintenance request has been recorded on behalf of beneficiary <strong>${escapeHtml(helpFriendState.beneficiaryRoll)}</strong>. An automated confirmation SMS notification has been triggered for their phone.
+        The maintenance request has been recorded on behalf of beneficiary <strong>${escapeHtml(helpFriendState.beneficiaryRoll)}</strong> (${escapeHtml(helpFriendState.studentMobile)}). An automated confirmation SMS notification has been triggered for their phone.
       </p>
 
       <div style="background: var(--surface-hover); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; margin: 16px 0; width: 100%; max-width: 440px; text-align: left; font-size: 13px;">
@@ -957,7 +1252,16 @@ function renderHelpStep4() {
   `;
 
   document.getElementById("btn-another-help")?.addEventListener("click", () => {
-    helpFriendState = { beneficiaryRoll: "", maskedPhone: "", otpVerificationId: null, complaintResult: null };
+    helpFriendState = { beneficiaryRoll: "", studentMobile: "", maskedPhone: "", demoOtp: "", otpVerificationId: null, complaintResult: null };
+    updateLiveOtpDemoState({
+      stage: "waiting_input",
+      studentId: "",
+      studentMobile: "",
+      generatedOtp: "",
+      timestamp: "",
+      isVerified: false,
+      ticketNumber: ""
+    });
     renderHelpStep1();
   });
 }
@@ -968,6 +1272,36 @@ function renderHelpStep4() {
    ========================================================================== */
 export async function renderStudentGatePasses(mainEl) {
   if (!mainEl) return;
+
+  const currentUser = store.getState().user;
+  const accType = (currentUser?.student_profile?.accommodation_type || "").trim().toUpperCase();
+  const isHosteler = accType === "HOSTELER";
+
+  if (!isHosteler) {
+    mainEl.innerHTML = `
+      <div style="margin-bottom: 20px;">
+        <h2>🎫 Gate Pass & One-Time QR System</h2>
+        <p style="margin: 2px 0 0 0; font-size: 13px; color: var(--text-secondary);">
+          Request campus leaves, track warden decisions, and display single-use QR passes at security gates.
+        </p>
+      </div>
+
+      <div class="card" style="text-align: center; padding: 48px 24px; border-left: 4px solid var(--color-signal-blue);">
+        <div style="font-size: 3rem; margin-bottom: 16px;">🏠</div>
+        <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text); margin-bottom: 8px;">
+          Gate Pass is Available Only to Hostel Residents
+        </h3>
+        <p style="max-width: 540px; margin: 0 auto 20px auto; color: var(--text-secondary); font-size: 14px; line-height: 1.5;">
+          Your current registered student accommodation is <strong>Day Scholar</strong>. Institutional gate passes and overnight outings are reserved exclusively for students residing in campus hostels.
+        </p>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <a href="#dashboard" class="btn btn-secondary">Return to Dashboard</a>
+          <a href="#complaints" class="btn btn-outline">Lodge a General Request</a>
+        </div>
+      </div>
+    `;
+    return;
+  }
 
   mainEl.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
@@ -1077,9 +1411,13 @@ async function loadGatePassesList(filter = "ALL") {
           const isApproved = gp.status === 'APPROVED';
           const isRejected = gp.status === 'REJECTED';
           const isUsed = ['CHECKED_OUT', 'COMPLETED', 'OVERDUE'].includes(gp.status);
+          let gpCardClass = "card-status-normal";
+          if (isApproved) gpCardClass = "card-status-resolved";
+          else if (isRejected) gpCardClass = "card-status-urgent";
+          else if (gp.status === 'PENDING') gpCardClass = "card-status-pending";
 
           return `
-            <div class="card" style="padding: 16px;">
+            <div class="card ${gpCardClass}" style="padding: 16px;">
               <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
                 <div>
                   <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
@@ -1109,8 +1447,8 @@ async function loadGatePassesList(filter = "ALL") {
                 <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
                   ${formatStatusBadge(gp.status)}
                   ${isApproved && gp.qr_token && gp.qr_token.qr_data_uri ? `
-                    <button class="btn btn-sm btn-outline" onclick="window.viewQrModal('${escapeHtml(gp.pass_number)}', '${gp.qr_token.qr_data_uri}')" type="button">
-                      🔍 Show QR Pass
+                    <button class="btn btn-sm btn-live" onclick="window.viewQrModal('${escapeHtml(gp.pass_number)}', '${gp.qr_token.qr_data_uri}')" type="button">
+                      📱 Show QR Pass
                     </button>
                   ` : isUsed ? `
                     <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">✓ QR already consumed</span>
@@ -1282,7 +1620,7 @@ export async function renderStudentDocuments(mainEl) {
           Request official bonafide certificates, fee estimates, and hostel dues clearances with cryptographic SHA-256 verification.
         </p>
       </div>
-      <button id="btn-open-doc-modal" class="btn btn-primary" type="button">
+      <button id="btn-open-doc-modal" class="btn btn-secondary" type="button">
         + Request Document
       </button>
     </div>
@@ -1331,11 +1669,11 @@ async function loadDocumentsList() {
           const isRejected = doc.status === 'REJECTED';
 
           return `
-            <div class="card" style="padding: 16px;">
+            <div class="card card-document" style="padding: 16px;">
               <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
                 <div>
                   <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                    <span style="font-family: var(--font-family-mono); font-weight: 700; font-size: 12px; color: var(--primary);">
+                    <span style="font-family: var(--font-family-mono); font-weight: 700; font-size: 12px; color: var(--color-ultra-violet);">
                       ${escapeHtml(doc.request_number)}
                     </span>
                     <span class="status-badge info" style="font-size: 10px;">${escapeHtml(doc.document_type)}</span>
@@ -1359,7 +1697,7 @@ async function loadDocumentsList() {
                 <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
                   ${formatStatusBadge(doc.status)}
                   ${isCompleted ? `
-                    <button class="btn btn-sm btn-primary" onclick="window.downloadDoc('${escapeHtml(doc.id)}')" type="button">
+                    <button class="btn btn-sm btn-success" onclick="window.downloadDoc('${escapeHtml(doc.id)}')" type="button">
                       📥 Download PDF
                     </button>
                   ` : ''}
@@ -1812,7 +2150,9 @@ export function renderStudentProfile(mainEl, user) {
               ${escapeHtml(user.first_name)} ${escapeHtml(user.last_name)}
             </div>
             <div style="font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; margin-top: 2px;">
-              <span>Roll No: <strong>${escapeHtml(sp.roll_number || '2201042')}</strong></span>
+              <span>Roll No: <strong>${escapeHtml(sp.college_roll_number || sp.roll_number || '2201042')}</strong></span>
+              <span>&bull;</span>
+              <span>Uni Reg: <strong>${escapeHtml(sp.university_reg_number || '—')}</strong></span>
               <span>&bull;</span>
               <span class="status-badge approved">Active Account</span>
             </div>
@@ -1821,24 +2161,45 @@ export function renderStudentProfile(mainEl, user) {
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 20px; font-size: 13px;">
           <div>
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">College Roll Number</div>
+            <div style="font-weight: 600; margin-top: 2px;"><code style="font-size: 13px;">${escapeHtml(sp.college_roll_number || sp.roll_number || '—')}</code></div>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">University Registration Number</div>
+            <div style="font-weight: 600; margin-top: 2px;"><code style="font-size: 13px;">${escapeHtml(sp.university_reg_number || 'Pending Verification')}</code></div>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Accommodation Category</div>
+            <div style="margin-top: 4px;">
+              <span class="status-badge ${sp.accommodation_type === 'HOSTELER' || sp.accommodation_type === 'Hosteler' ? 'info' : 'approved'}">
+                ${sp.accommodation_type === 'HOSTELER' || sp.accommodation_type === 'Hosteler' ? '🏢 Hosteler' : '🏡 Day Scholar'}
+              </span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Hostel Residency Details</div>
+            <div style="font-weight: 600; margin-top: 2px;">
+              ${(sp.accommodation_type === 'HOSTELER' || sp.accommodation_type === 'Hosteler' || sp.room_number)
+                ? `${escapeHtml(sp.hostel_name || 'Campus Hostel')}${sp.hostel_block ? ` • ${escapeHtml(sp.hostel_block)}` : ''} • Room ${escapeHtml(sp.room_number || 'Assigned')}`
+                : '<span style="color: var(--text-muted);">Day Scholar (Non-Resident)</span>'
+              }
+            </div>
+          </div>
+          <div>
             <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Department / Branch</div>
             <div style="font-weight: 600; margin-top: 2px;">${escapeHtml(sp.department || 'Computer Science & Engineering')}</div>
           </div>
           <div>
             <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Batch / Semester</div>
-            <div style="font-weight: 600; margin-top: 2px;">Batch ${sp.batch_year || 2022} &bull; Semester ${sp.semester || 6} (${sp.section || 'A'})</div>
+            <div style="font-weight: 600; margin-top: 2px;">Batch ${sp.batch_year || 2026} &bull; Semester ${sp.semester || 1} (${sp.section || 'A'})</div>
           </div>
           <div>
             <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Institutional Email</div>
             <div style="font-weight: 600; margin-top: 2px;">${escapeHtml(user.email)}</div>
           </div>
           <div>
-            <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Primary Phone</div>
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Primary Mobile Number</div>
             <div style="font-weight: 600; margin-top: 2px;">${escapeHtml(user.phone_number)}</div>
-          </div>
-          <div>
-            <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Hostel Accommodation</div>
-            <div style="font-weight: 600; margin-top: 2px;">Hostel Block B &bull; Room ${escapeHtml(sp.room_number || 'B-304')}</div>
           </div>
           <div>
             <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Dues Clearance Status</div>

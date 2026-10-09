@@ -31,7 +31,8 @@ def initiate_proxy(
     return proxy_service.initiate_proxy_otp(
         db=db,
         proxy_student=student,
-        beneficiary_roll_number=payload.beneficiary_roll_number
+        beneficiary_roll_number=payload.beneficiary_roll_number,
+        student_mobile_number=payload.student_mobile_number
     )
 
 

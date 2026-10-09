@@ -4,7 +4,8 @@
  */
 
 import { store } from "./state.js";
-import { isAuthenticated, getCurrentUser, getCurrentRole, login } from "./auth.js";
+import { api } from "./api.js";
+import { isAuthenticated, getCurrentUser, getCurrentRole, login, demoLogin, registerStudent } from "./auth.js";
 import { renderNavigation, renderPlaceholder, showToast } from "./ui.js";
 import { escapeHtml, formatRole, getGreeting } from "./utils.js";
 import {
@@ -382,7 +383,8 @@ function renderView(route) {
 }
 
 /* --------------------------------------------------------------------------
-   LOGIN VIEW RENDERER
+/* --------------------------------------------------------------------------
+   LOGIN & REGISTRATION VIEW RENDERER (CLEAN & DATABASE-DRIVEN)
    -------------------------------------------------------------------------- */
 function renderLoginView() {
   const container = document.getElementById("login-view-container");
@@ -392,11 +394,17 @@ function renderLoginView() {
 
   container.style.display = "block";
   container.innerHTML = `
-    <div class="login-card">
+    <div class="login-card" style="max-width: 480px;">
       <div class="login-header">
         <div class="login-logo">CF</div>
         <h1 class="login-title">CampusFlow</h1>
         <p class="login-subtitle">Unified Campus Operations Platform &bull; BPUT 2026</p>
+      </div>
+
+      <!-- Auth Mode Switcher -->
+      <div class="filter-tabs" style="margin-bottom: 20px; display: flex; width: 100%;">
+        <button type="button" id="tab-auth-login" class="filter-tab active" style="flex: 1; text-align: center;">Sign In</button>
+        <button type="button" id="tab-auth-register" class="filter-tab" style="flex: 1; text-align: center;">Student Registration</button>
       </div>
 
       <div id="login-alert" class="form-alert error" role="alert">
@@ -404,6 +412,7 @@ function renderLoginView() {
         <span id="login-alert-msg">Invalid credentials</span>
       </div>
 
+      <!-- 1. SIGN IN FORM -->
       <form id="login-form" autocomplete="on">
         <div class="form-group">
           <label class="form-label" for="login-identifier">
@@ -415,7 +424,7 @@ function renderLoginView() {
               type="text" 
               id="login-identifier" 
               class="form-input" 
-              placeholder="e.g. 2201042 or priya.sharma@bput.ac.in" 
+              placeholder="e.g. roll number or email" 
               required 
               autocomplete="username"
             />
@@ -425,7 +434,6 @@ function renderLoginView() {
         <div class="form-group">
           <label class="form-label" for="login-password">
             Password
-            <span class="form-label-desc">Default: CampusFlow@2026</span>
           </label>
           <div class="form-control-wrap">
             <input 
@@ -446,80 +454,199 @@ function renderLoginView() {
             <span id="login-btn-spinner" class="spinner" style="display: none; width: 18px; height: 18px;"></span>
           </button>
         </div>
+
+        <div style="margin-top: 16px; font-size: 11px; color: var(--text-muted); text-align: center; line-height: 1.5;">
+          🔒 Fully database-driven. First Campus Administrator can be bootstrapped via CLI (<code>python bootstrap_admin.py</code>).
+        </div>
+
+        <!-- QUICK DEMO ONE-TAP LOGIN SECTION -->
+        <div id="demo-logins-section" class="demo-logins-box" style="display: none;">
+          <div class="demo-logins-title">
+            <span>⚡ Quick Demo Login</span>
+            <span style="font-size: 10px; font-weight: normal; color: var(--text-muted);">Non-Production Only</span>
+          </div>
+          <div class="demo-chips-grid" id="demo-chips-grid"></div>
+        </div>
       </form>
 
-      <!-- Quick Demo Login Selector (Crucial for Hackathon Evaluators) -->
-      <div class="demo-logins-box">
-        <div class="demo-logins-title">
-          <span>⚡ 1-Click Demo Accounts</span>
-          <span>8 Institutional Roles</span>
+      <!-- 2. STUDENT SELF-REGISTRATION FORM -->
+      <form id="register-form" style="display: none;" autocomplete="off">
+        <div class="form-group">
+          <label class="form-label" for="reg-name">Full Name *</label>
+          <input type="text" id="reg-name" class="form-input" placeholder="e.g. Priya Sharma" required />
         </div>
-        <div class="demo-chips-grid">
-          <button type="button" class="btn-demo-chip" data-user="priya.sharma@bput.ac.in">
-            <span class="demo-chip-role">Student</span>
-            <span class="demo-chip-name">Priya Sharma (CSE)</span>
-          </button>
-          <button type="button" class="btn-demo-chip" data-user="dean.admin@bput.ac.in">
-            <span class="demo-chip-role">Campus Admin</span>
-            <span class="demo-chip-name">Ashok Patnaik</span>
-          </button>
-          <button type="button" class="btn-demo-chip" data-user="warden.sharma@bput.ac.in">
-            <span class="demo-chip-role">Warden</span>
-            <span class="demo-chip-name">Sunil Sharma (Block B)</span>
-          </button>
-          <button type="button" class="btn-demo-chip" data-user="dr.mishra.hostel@bput.ac.in">
-            <span class="demo-chip-role">Hostel Faculty</span>
-            <span class="demo-chip-name">Bijoy Mishra</span>
-          </button>
-          <button type="button" class="btn-demo-chip" data-user="prof.mohanty@bput.ac.in">
-            <span class="demo-chip-role">Teacher</span>
-            <span class="demo-chip-name">Subhashree Mohanty</span>
-          </button>
-          <button type="button" class="btn-demo-chip" data-user="ramesh.lab@bput.ac.in">
-            <span class="demo-chip-role">Lab Assistant</span>
-            <span class="demo-chip-name">Ramesh Nayak</span>
-          </button>
-          <button type="button" class="btn-demo-chip" data-user="ramesh.estate@bput.ac.in">
-            <span class="demo-chip-role">Maintenance Staff</span>
-            <span class="demo-chip-name">Kailash Sahoo</span>
-          </button>
-          <button type="button" class="btn-demo-chip" data-user="guard.gate1@bput.ac.in">
-            <span class="demo-chip-role">Security Guard</span>
-            <span class="demo-chip-name">Dhaneswar Pradhan</span>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label class="form-label" for="reg-email">Institutional Email *</label>
+            <input type="email" id="reg-email" class="form-input" placeholder="name@campus.edu" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="reg-phone">Mobile Number *</label>
+            <input type="tel" id="reg-phone" class="form-input" placeholder="10-digit mobile number" required pattern="[0-9]{10,15}" />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label class="form-label" for="reg-password">Password (min 8 chars) *</label>
+            <input type="password" id="reg-password" class="form-input" placeholder="Create secure password" minlength="8" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="reg-confirm-password">Confirm Password *</label>
+            <input type="password" id="reg-confirm-password" class="form-input" placeholder="Re-enter password" minlength="8" required />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label class="form-label" for="reg-roll">College Roll Number *</label>
+            <input type="text" id="reg-roll" class="form-input" placeholder="e.g. 2201042" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="reg-uni-reg">University Registration Number *</label>
+            <input type="text" id="reg-uni-reg" class="form-input" placeholder="e.g. 2201108204" required />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label class="form-label" for="reg-branch">Department / Branch</label>
+            <input type="text" id="reg-branch" class="form-input" placeholder="Computer Science & Engineering" value="Computer Science & Engineering" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="reg-batch">Batch Year</label>
+            <input type="number" id="reg-batch" class="form-input" placeholder="2026" value="2026" />
+          </div>
+        </div>
+
+        <!-- Accommodation Type Selection (Required) -->
+        <div class="form-group">
+          <label class="form-label" for="reg-accommodation">Accommodation Type *</label>
+          <select id="reg-accommodation" class="form-select" required>
+            <option value="Day Scholar" selected>Day Scholar</option>
+            <option value="Hosteler">Hosteler</option>
+          </select>
+        </div>
+
+        <!-- Dynamic Hostel Residency Fields Container (Shown only when Hosteler is selected) -->
+        <div id="hostel-fields-container" style="display: none; padding: 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-secondary); margin-bottom: 12px;">
+          <div style="font-size: 11px; font-weight: 700; color: var(--color-royal-iris); margin-bottom: 8px; text-transform: uppercase;">
+            🏢 Hostel Residency Details
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="reg-hostel-select">Hostel Facility *</label>
+            <select id="reg-hostel-select" class="form-select">
+              <option value="">-- Loading available hostels... --</option>
+            </select>
+            <div id="reg-hostel-hint" style="font-size: 11px; color: var(--text-muted); margin-top: 4px;"></div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label class="form-label" for="reg-hostel-block">Hostel Block (if applicable)</label>
+              <input type="text" id="reg-hostel-block" class="form-input" placeholder="e.g. Block A" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="reg-room">Room Number (if applicable)</label>
+              <input type="text" id="reg-room" class="form-input" placeholder="e.g. 104" />
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 16px;">
+          <button type="submit" id="btn-submit-reg" class="btn btn-secondary" style="width: 100%; height: 42px;">
+            <span id="reg-btn-text">Complete Student Enrollment</span>
+            <span id="reg-btn-spinner" class="spinner" style="display: none; width: 18px; height: 18px;"></span>
           </button>
         </div>
-      </div>
+      </form>
     </div>
   `;
 
-  // Attach login form submission
-  const form = document.getElementById("login-form");
-  const identifierInput = document.getElementById("login-identifier");
-  const passwordInput = document.getElementById("login-password");
-  const togglePwdBtn = document.getElementById("btn-toggle-pwd");
+  // Attach tabs switcher
+  const tabLogin = document.getElementById("tab-auth-login");
+  const tabRegister = document.getElementById("tab-auth-register");
+  const formLogin = document.getElementById("login-form");
+  const formRegister = document.getElementById("register-form");
   const alertEl = document.getElementById("login-alert");
   const alertMsg = document.getElementById("login-alert-msg");
-  const submitBtn = document.getElementById("btn-submit-login");
-  const btnText = document.getElementById("login-btn-text");
-  const btnSpinner = document.getElementById("login-btn-spinner");
 
+  tabLogin?.addEventListener("click", () => {
+    tabLogin.classList.add("active");
+    tabRegister?.classList.remove("active");
+    formLogin.style.display = "block";
+    formRegister.style.display = "none";
+    alertEl?.classList.remove("visible");
+  });
+
+  tabRegister?.addEventListener("click", () => {
+    tabRegister.classList.add("active");
+    tabLogin?.classList.remove("active");
+    formRegister.style.display = "block";
+    formLogin.style.display = "none";
+    alertEl?.classList.remove("visible");
+  });
+
+  // Attach Accommodation Type change handler (Hosteler vs Day Scholar)
+  const accommodationSelect = document.getElementById("reg-accommodation");
+  const hostelContainer = document.getElementById("hostel-fields-container");
+  const hostelSelect = document.getElementById("reg-hostel-select");
+  const hostelBlockInput = document.getElementById("reg-hostel-block");
+  const roomInput = document.getElementById("reg-room");
+  const hostelHint = document.getElementById("reg-hostel-hint");
+
+  let hostelsLoaded = false;
+  const loadHostelsList = async () => {
+    try {
+      const list = await api.get("/api/v1/auth/hostels");
+      if (!hostelSelect) return;
+      if (list && list.length > 0) {
+        hostelSelect.innerHTML = `<option value="">-- Select Hostel Facility --</option>` +
+          list.map(h => `<option value="${h.id}">${escapeHtml(h.name)} (${escapeHtml(h.code)}) — ${h.available_rooms} rooms available</option>`).join("");
+        if (hostelHint) hostelHint.textContent = `${list.length} campus hostel facility records found.`;
+      } else {
+        hostelSelect.innerHTML = `<option value="">-- No hostels registered in DB yet --</option>`;
+        if (hostelHint) hostelHint.textContent = "No hostel facilities configured in database yet. Hostels can be created by Admin.";
+      }
+      hostelsLoaded = true;
+    } catch (err) {
+      if (hostelSelect) hostelSelect.innerHTML = `<option value="">-- Select Hostel --</option>`;
+      if (hostelHint) hostelHint.textContent = "Could not load hostels from server.";
+    }
+  };
+
+  accommodationSelect?.addEventListener("change", async () => {
+    const isHosteler = accommodationSelect.value === "Hosteler";
+    if (isHosteler) {
+      if (hostelContainer) hostelContainer.style.display = "block";
+      if (!hostelsLoaded) {
+        await loadHostelsList();
+      }
+    } else {
+      // Day Scholar: Hide hostel fields immediately and clear all values
+      if (hostelContainer) hostelContainer.style.display = "none";
+      if (hostelSelect) hostelSelect.value = "";
+      if (hostelBlockInput) hostelBlockInput.value = "";
+      if (roomInput) roomInput.value = "";
+    }
+  });
+
+  // Attach password toggle
+  const passwordInput = document.getElementById("login-password");
+  const togglePwdBtn = document.getElementById("btn-toggle-pwd");
   togglePwdBtn?.addEventListener("click", () => {
     const isPwd = passwordInput.type === "password";
     passwordInput.type = isPwd ? "text" : "password";
     togglePwdBtn.textContent = isPwd ? "🙈" : "👁️";
   });
 
-  // Attach quick demo click handlers
-  container.querySelectorAll(".btn-demo-chip").forEach(chip => {
-    chip.addEventListener("click", () => {
-      const email = chip.getAttribute("data-user");
-      identifierInput.value = email;
-      passwordInput.value = "CampusFlow@2026";
-      form.requestSubmit();
-    });
-  });
+  // Attach login submission
+  const identifierInput = document.getElementById("login-identifier");
+  const submitBtn = document.getElementById("btn-submit-login");
+  const btnText = document.getElementById("login-btn-text");
+  const btnSpinner = document.getElementById("login-btn-spinner");
 
-  form.addEventListener("submit", async (e) => {
+  formLogin.addEventListener("submit", async (e) => {
     e.preventDefault();
     alertEl.classList.remove("visible");
 
@@ -543,6 +670,120 @@ function renderLoginView() {
       btnSpinner.style.display = "none";
     }
   });
+
+  // Load Quick Demo Login accounts if enabled (non-production only)
+  const demoSection = document.getElementById("demo-logins-section");
+  const demoGrid = document.getElementById("demo-chips-grid");
+  const loadDemoAccounts = async () => {
+    try {
+      const accounts = await api.get("/api/v1/auth/demo-accounts");
+      if (accounts && accounts.length > 0 && demoSection && demoGrid) {
+        demoGrid.innerHTML = accounts.map(acc => `
+          <button type="button" class="btn-demo-chip" data-role="${escapeHtml(acc.role)}" data-username="${escapeHtml(acc.username)}" title="${escapeHtml(acc.subtext)}">
+            <span style="font-weight: 700; color: var(--text);">${escapeHtml(acc.role_label)}</span>
+            <span style="font-size: 10px; color: var(--text-muted); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${escapeHtml(acc.display_name)}</span>
+          </button>
+        `).join("");
+        demoSection.style.display = "block";
+
+        demoGrid.querySelectorAll(".btn-demo-chip").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const role = btn.dataset.role;
+            const username = btn.dataset.username;
+            alertEl?.classList.remove("visible");
+            const roleName = btn.querySelector("span")?.textContent || role;
+            btn.style.opacity = "0.5";
+            btn.style.pointerEvents = "none";
+            try {
+              await demoLogin(role, username);
+              showToast(`Authenticated as ${roleName}! Welcome to CampusFlow.`, "success");
+              window.location.hash = "#dashboard";
+              handleRoute("#dashboard");
+            } catch (err) {
+              btn.style.opacity = "1";
+              btn.style.pointerEvents = "auto";
+              alertMsg.textContent = err.message || "Quick demo login failed.";
+              alertEl?.classList.add("visible");
+            }
+          });
+        });
+      }
+    } catch (err) {
+      // Demo accounts disabled or unavailable in production — keep drawer hidden
+      if (demoSection) demoSection.style.display = "none";
+    }
+  };
+  loadDemoAccounts();
+
+  // Attach registration submission
+  formRegister?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    alertEl.classList.remove("visible");
+
+    const regBtn = document.getElementById("btn-submit-reg");
+    const regBtnText = document.getElementById("reg-btn-text");
+    const regBtnSpinner = document.getElementById("reg-btn-spinner");
+
+    const pwd = document.getElementById("reg-password").value;
+    const confirmPwd = document.getElementById("reg-confirm-password").value;
+
+    if (pwd !== confirmPwd) {
+      alertMsg.textContent = "Password and confirm password do not match. Please verify.";
+      alertEl.classList.add("visible");
+      return;
+    }
+
+    const isHosteler = accommodationSelect.value === "Hosteler";
+    let selectedHostelId = null;
+    let selectedHostelName = null;
+
+    if (isHosteler && hostelSelect && hostelSelect.value) {
+      selectedHostelId = hostelSelect.value;
+      if (hostelSelect.selectedIndex >= 0) {
+        selectedHostelName = hostelSelect.options[hostelSelect.selectedIndex].text.split("—")[0].trim();
+      }
+    }
+
+    regBtn.disabled = true;
+    regBtnText.style.display = "none";
+    regBtnSpinner.style.display = "inline-block";
+
+    const payload = {
+      full_name: document.getElementById("reg-name").value.trim(),
+      email: document.getElementById("reg-email").value.trim(),
+      phone: document.getElementById("reg-phone").value.trim(),
+      password: pwd,
+      confirm_password: confirmPwd,
+      college_roll_number: document.getElementById("reg-roll").value.trim().toUpperCase(),
+      roll_number: document.getElementById("reg-roll").value.trim().toUpperCase(),
+      university_reg_number: document.getElementById("reg-uni-reg").value.trim().toUpperCase(),
+      accommodation_type: isHosteler ? "Hosteler" : "Day Scholar",
+      hostel_id: isHosteler ? selectedHostelId : null,
+      hostel_name: isHosteler ? selectedHostelName : null,
+      hostel_block: isHosteler ? (hostelBlockInput?.value.trim() || null) : null,
+      room_number: isHosteler ? (roomInput?.value.trim() || null) : null,
+      department: document.getElementById("reg-branch").value.trim() || "Computer Science & Engineering",
+      batch_year: parseInt(document.getElementById("reg-batch").value, 10) || 2026,
+      section: "A"
+    };
+
+    try {
+      await registerStudent(payload);
+      showToast("Student enrollment successful! Logging in...", "success");
+      await login(payload.email, payload.password);
+      regBtn.disabled = false;
+      regBtnText.style.display = "inline";
+      regBtnSpinner.style.display = "none";
+      window.location.hash = "#dashboard";
+      handleRoute("#dashboard");
+    } catch (err) {
+      alertMsg.textContent = err.message || "Enrollment failed. Please check your inputs.";
+      alertEl.classList.add("visible");
+      regBtn.disabled = false;
+      regBtnText.style.display = "inline";
+      regBtnSpinner.style.display = "none";
+    }
+  });
 }
 
 /* --------------------------------------------------------------------------
@@ -558,21 +799,79 @@ function renderDashboardView(user, role) {
 
   const quickActions = getQuickActions(role);
 
+  const roleIdentityMap = {
+    STUDENT: {
+      gradient: "linear-gradient(135deg, var(--color-night-violet) 0%, var(--color-royal-iris) 100%)",
+      borderAccent: "var(--color-butter-yellow)",
+      badgeBg: "var(--color-butter-yellow)",
+      badgeColor: "var(--color-graphite)"
+    },
+    WARDEN: {
+      gradient: "linear-gradient(135deg, var(--color-graphite) 0%, #3B2A20 100%)",
+      borderAccent: "var(--color-soft-apricot)",
+      badgeBg: "var(--color-soft-apricot)",
+      badgeColor: "var(--color-graphite)"
+    },
+    HOSTEL_FACULTY: {
+      gradient: "linear-gradient(135deg, var(--color-graphite) 0%, #064E3B 100%)",
+      borderAccent: "var(--color-champagne)",
+      badgeBg: "var(--color-champagne)",
+      badgeColor: "var(--color-emerald-ink)"
+    },
+    TEACHER: {
+      gradient: "linear-gradient(135deg, var(--color-graphite) 0%, #2A1152 100%)",
+      borderAccent: "var(--color-ultra-violet)",
+      badgeBg: "rgba(106, 0, 244, 0.25)",
+      badgeColor: "#E0D0FF"
+    },
+    LAB_ASSISTANT: {
+      gradient: "linear-gradient(135deg, var(--color-graphite) 0%, #3B0E2A 100%)",
+      borderAccent: "var(--color-dragonfruit)",
+      badgeBg: "rgba(255, 70, 150, 0.25)",
+      badgeColor: "#FFB0D2"
+    },
+    STAFF: {
+      gradient: "linear-gradient(135deg, var(--color-graphite) 0%, #2B2818 100%)",
+      borderAccent: "var(--color-butter-yellow)",
+      badgeBg: "var(--color-butter-yellow)",
+      badgeColor: "var(--color-graphite)"
+    },
+    GUARD: {
+      gradient: "linear-gradient(135deg, var(--color-night-violet) 0%, #0B291D 100%)",
+      borderAccent: "var(--color-lime-spark)",
+      badgeBg: "var(--color-lime-spark)",
+      badgeColor: "var(--color-graphite)"
+    },
+    ADMIN: {
+      gradient: "linear-gradient(135deg, var(--color-graphite) 0%, var(--color-royal-iris) 100%)",
+      borderAccent: "var(--color-ultra-violet)",
+      badgeBg: "var(--color-ultra-violet)",
+      badgeColor: "#FFFFFF"
+    }
+  };
+
+  const iden = roleIdentityMap[role] || {
+    gradient: "linear-gradient(135deg, var(--color-graphite) 0%, var(--color-night-violet) 100%)",
+    borderAccent: "var(--color-signal-blue)",
+    badgeBg: "rgba(0, 87, 255, 0.2)",
+    badgeColor: "#A8CCFF"
+  };
+
   main.innerHTML = `
-    <!-- Top Welcome Banner -->
-    <div class="card" style="background: linear-gradient(135deg, var(--surface), var(--surface-hover)); border-left: 4px solid var(--primary);">
+    <!-- Top Welcome Banner with Role-Specific Palette Identity (Item 10) -->
+    <div class="card card-graphite" style="background: ${iden.gradient}; border-left: 5px solid ${iden.borderAccent}; box-shadow: var(--shadow-md);">
       <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
         <div>
-          <div style="font-size: 1.25rem; font-weight: 700; color: var(--text);">
+          <div style="font-size: 1.25rem; font-weight: 700; color: #FFFFFF;">
             ${escapeHtml(getGreeting(user.first_name))} 👋
           </div>
-          <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--text-secondary);">
-            Logged in as <strong style="color: var(--text);">${escapeHtml(user.first_name)} ${escapeHtml(user.last_name)}</strong> &bull; 
-            <span class="status-badge info">${escapeHtml(formatRole(role))}</span>
+          <p style="margin: 4px 0 0 0; font-size: 13px; color: #CBD2DE;">
+            Logged in as <strong style="color: #FFFFFF;">${escapeHtml(user.first_name)} ${escapeHtml(user.last_name)}</strong> &bull; 
+            <span class="status-badge" style="background: ${iden.badgeBg}; color: ${iden.badgeColor}; border: 1px solid ${iden.borderAccent}; font-weight: 700;">${escapeHtml(formatRole(role))}</span>
           </p>
         </div>
         <div style="display: flex; gap: 8px;">
-          <a href="#about" class="btn btn-sm btn-outline">System Diagnostics</a>
+          <a href="#about" class="btn btn-sm btn-outline-secondary" style="border-color: rgba(255, 255, 255, 0.2); color: #FFFFFF;">System Diagnostics</a>
         </div>
       </div>
     </div>
@@ -606,9 +905,17 @@ function renderDashboardView(user, role) {
           <div><strong style="color: var(--text-muted); font-size: 11px;">EMAIL</strong><br/>${escapeHtml(user.email)}</div>
           <div><strong style="color: var(--text-muted); font-size: 11px;">PHONE</strong><br/>${escapeHtml(user.phone_number)}</div>
           ${user.student_profile ? `
-            <div><strong style="color: var(--text-muted); font-size: 11px;">ROLL NUMBER</strong><br/>${escapeHtml(user.student_profile.roll_number)}</div>
+            <div><strong style="color: var(--text-muted); font-size: 11px;">COLLEGE ROLL NUMBER</strong><br/><code style="font-weight: 700;">${escapeHtml(user.student_profile.college_roll_number || user.student_profile.roll_number)}</code></div>
+            <div><strong style="color: var(--text-muted); font-size: 11px;">UNIVERSITY REG. NUMBER</strong><br/><code style="font-weight: 700;">${escapeHtml(user.student_profile.university_reg_number || 'Pending Verification')}</code></div>
+            <div><strong style="color: var(--text-muted); font-size: 11px;">ACCOMMODATION TYPE</strong><br/>
+              <span class="status-badge ${user.student_profile.accommodation_type === 'HOSTELER' || user.student_profile.accommodation_type === 'Hosteler' ? 'info' : 'approved'}" style="font-size: 10px;">
+                ${user.student_profile.accommodation_type === 'HOSTELER' || user.student_profile.accommodation_type === 'Hosteler' ? '🏢 Hosteler' : '🏡 Day Scholar'}
+              </span>
+            </div>
+            ${(user.student_profile.accommodation_type === 'HOSTELER' || user.student_profile.accommodation_type === 'Hosteler' || user.student_profile.room_number) ? `
+              <div><strong style="color: var(--text-muted); font-size: 11px;">HOSTEL RESIDENCE</strong><br/>${escapeHtml(user.student_profile.hostel_block ? `${user.student_profile.hostel_block} • ` : '')}Room ${escapeHtml(user.student_profile.room_number || 'Assigned')}</div>
+            ` : ''}
             <div><strong style="color: var(--text-muted); font-size: 11px;">DEPARTMENT</strong><br/>${escapeHtml(user.student_profile.department)} (Sem ${user.student_profile.semester})</div>
-            <div><strong style="color: var(--text-muted); font-size: 11px;">HOSTEL RESIDENCE</strong><br/>Room ${escapeHtml(user.student_profile.room_number || 'Day Scholar')}</div>
           ` : ''}
           ${user.staff_profile ? `
             <div><strong style="color: var(--text-muted); font-size: 11px;">DESIGNATION</strong><br/>${escapeHtml(user.staff_profile.designation)}</div>

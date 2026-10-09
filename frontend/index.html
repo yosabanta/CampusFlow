@@ -13,14 +13,14 @@
   <link rel="apple-touch-icon" href="assets/icons/icon-192.svg">
 
   <!-- Core Modular CSS Architecture (Zero Framework Overhead) -->
-  <link rel="stylesheet" href="css/variables.css">
-  <link rel="stylesheet" href="css/themes.css">
-  <link rel="stylesheet" href="css/base.css">
-  <link rel="stylesheet" href="css/layout.css">
-  <link rel="stylesheet" href="css/components.css">
-  <link rel="stylesheet" href="css/forms.css">
-  <link rel="stylesheet" href="css/tables.css">
-  <link rel="stylesheet" href="css/responsive.css">
+  <link rel="stylesheet" href="css/variables.css?v=palette2026">
+  <link rel="stylesheet" href="css/themes.css?v=palette2026">
+  <link rel="stylesheet" href="css/base.css?v=palette2026">
+  <link rel="stylesheet" href="css/layout.css?v=palette2026">
+  <link rel="stylesheet" href="css/components.css?v=palette2026">
+  <link rel="stylesheet" href="css/forms.css?v=palette2026">
+  <link rel="stylesheet" href="css/tables.css?v=palette2026">
+  <link rel="stylesheet" href="css/responsive.css?v=palette2026">
 </head>
 <body>
   <!-- Standalone Login View Container (Active when unauthenticated) -->
@@ -150,10 +150,14 @@
   <!-- For public hosting, set window.BACKEND_API_URL to your Render Web Service URL (e.g. "https://campusflow-backend.onrender.com") -->
   <!-- When left as empty string or unset, it automatically falls back to "http://localhost:8000" for local development -->
   <script>
-    window.BACKEND_API_URL = "https://campusflow-backend-ja6v.onrender.com";
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      window.BACKEND_API_URL = "http://localhost:8000";
+    } else {
+      window.BACKEND_API_URL = "https://campusflow-backend-ja6v.onrender.com";
+    }
   </script>
 
   <!-- Native ES Module Application Bootstrap -->
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/app.js?v=palette2026"></script>
 </body>
 </html>

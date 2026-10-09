@@ -17,20 +17,27 @@ import { showToast, loadNoticeBoard } from "./ui.js";
 import { escapeHtml, formatDate, timeAgo, formatRole } from "./utils.js";
 
 /* --------------------------------------------------------------------------
-   KNOWN INSTITUTIONAL STAFF REGISTRY (For Complaint Assignment)
+   DYNAMIC INSTITUTIONAL STAFF REGISTRY (For Complaint Assignment)
    -------------------------------------------------------------------------- */
-const INSTITUTIONAL_STAFF = [
-  { id: "21ec6b37-1466-4abd-89e0-063336cf4781", name: "Kailash Sahoo", role: "STAFF", dept: "Estate & Maintenance", title: "Senior Maintenance Supervisor" },
-  { id: "6d889135-a03f-4fbc-ba97-87d956c01195", name: "Sunil Sharma", role: "WARDEN", dept: "Hostel Administration", title: "Chief Warden (Block B)" },
-  { id: "46cb1ec2-fb28-4b92-b97d-335bdaf669f3", name: "Dr. Bijoy Mishra", role: "HOSTEL_FACULTY", dept: "Hostel Affairs Board", title: "Faculty Advisor" },
-  { id: "1f1d9bce-445d-484a-b8bc-7aa891f89fee", name: "Ramesh Nayak", role: "LAB_ASSISTANT", dept: "Mechanical Engineering", title: "Workshop Lathe Assistant" },
-  { id: "af6a3c3b-ef1d-4511-8330-7f259ac036fc", name: "Dhaneswar Pradhan", role: "GUARD", dept: "Perimeter Security", title: "Main Gate Officer" }
-];
+let CACHED_STAFF = [];
 
-function getStaffNameById(staffId) {
+export async function getInstitutionalStaff() {
+  if (CACHED_STAFF.length > 0) return CACHED_STAFF;
+  try {
+    const list = await api.get("/api/v1/admin/staff");
+    CACHED_STAFF = list || [];
+    return CACHED_STAFF;
+  } catch (err) {
+    console.warn("Failed to load institutional staff from backend:", err);
+    return [];
+  }
+}
+
+function getStaffNameById(staffId, fallbackName = null) {
   if (!staffId) return null;
-  const staff = INSTITUTIONAL_STAFF.find(s => s.id === staffId);
-  return staff ? `${staff.name} (${staff.title})` : `Staff ID: ${staffId.substring(0, 8)}...`;
+  if (fallbackName) return fallbackName;
+  const staff = CACHED_STAFF.find(s => s.id === staffId || s.user_id === staffId);
+  return staff ? `${staff.full_name} (${staff.designation || staff.role})` : `Staff ID: ${staffId.substring(0, 8)}...`;
 }
 
 /* --------------------------------------------------------------------------
@@ -124,6 +131,9 @@ export async function renderAdminControlTower(mainEl, user) {
       </div>
 
       <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="btn btn-secondary" id="btn-admin-manage-users" type="button" style="min-height: 44px;">
+          👥 User Directory & Provisioning
+        </button>
         <button class="btn btn-primary" id="btn-admin-broadcast" type="button" style="min-height: 44px;">
           📢 Broadcast Announcement
         </button>
@@ -170,8 +180,8 @@ export async function renderAdminControlTower(mainEl, user) {
       </div>
 
       <!-- Immutable Audit Events -->
-      <div class="card" style="padding: 16px; border-left: 4px solid #8B5CF6; cursor: pointer;" id="card-kpi-audits">
-        <div style="font-size: 11px; font-weight: 700; color: #8B5CF6; text-transform: uppercase;">Immutable Audit Logs</div>
+      <div class="card" style="padding: 16px; border-left: 4px solid var(--color-ultra-violet); cursor: pointer;" id="card-kpi-audits">
+        <div style="font-size: 11px; font-weight: 700; color: var(--color-ultra-violet); text-transform: uppercase;">Immutable Audit Logs</div>
         <div id="kpi-total-audits" style="font-size: 28px; font-weight: 800; color: var(--text); margin-top: 4px;">--</div>
         <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Tamper-evident events &bull; View ➔</div>
       </div>
@@ -251,6 +261,10 @@ export async function renderAdminControlTower(mainEl, user) {
   `;
 
   // Attach quick action listeners
+  document.getElementById("btn-admin-manage-users")?.addEventListener("click", () => {
+    openAdminUserManagementModal(() => loadControlTowerData());
+  });
+
   document.getElementById("btn-admin-broadcast")?.addEventListener("click", () => {
     openCreateAnnouncementModal(() => renderAdminControlTower(mainEl, user));
   });
@@ -412,7 +426,7 @@ export async function renderAdminControlTower(mainEl, user) {
               { key: 'ASSIGNED', label: 'Assigned to Staff', count: cStatus.ASSIGNED || 0, color: 'var(--info)' },
               { key: 'IN_PROGRESS', label: 'In Progress (Active Work)', count: cStatus.IN_PROGRESS || 0, color: 'var(--warning)' },
               { key: 'RESOLVED', label: 'Resolved (Awaiting Student Close)', count: cStatus.RESOLVED || 0, color: 'var(--success)' },
-              { key: 'COMPLETED', label: 'Completed & Closed', count: (cStatus.COMPLETED || 0) + (cStatus.CLOSED || 0), color: '#10B981' }
+              { key: 'COMPLETED', label: 'Completed & Closed', count: (cStatus.COMPLETED || 0) + (cStatus.CLOSED || 0), color: 'var(--color-emerald-ink)' }
             ].map(row => {
               const pct = Math.round((row.count / total) * 100);
               return `
@@ -468,7 +482,7 @@ export async function renderAdminControlTower(mainEl, user) {
           auditEl.innerHTML = `
             <div style="display: flex; flex-direction: column; gap: 6px;">
               ${audits.map(a => `
-                <div style="font-size: 12px; padding: 8px 10px; background: var(--surface-hover); border-radius: var(--radius-sm); border-left: 3px solid #8B5CF6;">
+                <div style="font-size: 12px; padding: 8px 10px; background: var(--surface-hover); border-radius: var(--radius-sm); border-left: 3px solid var(--color-ultra-violet);">
                   <div style="display: flex; justify-content: space-between; align-items: center;">
                     ${formatAuditActionBadge(a.action)}
                     <span style="font-size: 10px; color: var(--text-muted);">${timeAgo(a.timestamp)}</span>
@@ -887,7 +901,10 @@ window.adminOpenComplaint = async (id) => {
   modalRoot.innerHTML = `<div class="modal-backdrop active"><div class="modal-dialog" style="padding: 40px; text-align: center;"><div class="spinner"></div></div></div>`;
 
   try {
-    const c = await api.get(`/api/v1/complaints/${id}`);
+    const [c, staffList] = await Promise.all([
+      api.get(`/api/v1/complaints/${id}`),
+      getInstitutionalStaff()
+    ]);
 
     modalRoot.innerHTML = `
       <div class="modal-backdrop active" id="modal-complaint-backdrop">
@@ -952,9 +969,10 @@ window.adminOpenComplaint = async (id) => {
                   <label class="form-label" for="sel-assign-staff" style="font-size: 11px;">Assign Maintenance Supervisor</label>
                   <select class="form-input" id="sel-assign-staff">
                     <option value="">-- Choose Institutional Staff --</option>
-                    ${INSTITUTIONAL_STAFF.map(st => `
+                    ${staffList.length === 0 ? '<option value="" disabled>No staff available. Add staff via Admin Control Tower.</option>' : ''}
+                    ${staffList.map(st => `
                       <option value="${st.id}" ${c.assigned_staff_id === st.id ? 'selected' : ''}>
-                        ${escapeHtml(st.name)} — ${escapeHtml(st.title)} (${escapeHtml(st.dept)})
+                        ${escapeHtml(st.full_name)} — ${escapeHtml(st.designation || st.role)} (${escapeHtml(st.department || 'Campus')})
                       </option>
                     `).join("")}
                   </select>
@@ -1324,7 +1342,7 @@ export async function renderAdminAuditLogs(mainEl) {
   mainEl.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
       <div>
-        <div style="font-size: 12px; font-weight: 800; color: #8B5CF6; text-transform: uppercase;">
+        <div style="font-size: 12px; font-weight: 800; color: var(--color-ultra-violet); text-transform: uppercase;">
           PS07 Regulatory Compliance & Security Ledger
         </div>
         <h2 style="margin: 2px 0 0 0; font-size: 22px; font-weight: 800; color: var(--text);">
@@ -1476,7 +1494,7 @@ export async function renderAdminAuditLogs(mainEl) {
         <div class="modal-dialog" style="max-width: 600px;" role="dialog" aria-modal="true" aria-labelledby="modal-audit-title">
           <div class="modal-header">
             <div>
-              <span style="font-size: 11px; font-weight: 700; color: #8B5CF6; text-transform: uppercase;">Audit Event Record</span>
+              <span style="font-size: 11px; font-weight: 700; color: var(--color-ultra-violet); text-transform: uppercase;">Audit Event Record</span>
               <h3 id="modal-audit-title" style="margin: 2px 0 0 0; font-size: 18px; font-weight: 800;">
                 ${escapeHtml(log.action)}
               </h3>
@@ -1713,4 +1731,298 @@ export async function renderAdminProfile(mainEl, user) {
       </div>
     </div>
   `;
+}
+
+/* ==========================================================================
+   ADMIN — USER DIRECTORY & PROVISIONING MODAL
+   GET /api/v1/admin/staff, GET /api/v1/admin/students, POST /api/v1/admin/users
+   ========================================================================== */
+export async function openAdminUserManagementModal(onSuccess = null) {
+  const modalRoot = document.getElementById("admin-modal-root");
+  if (!modalRoot) return;
+
+  modalRoot.innerHTML = `
+    <div class="modal-backdrop active" id="modal-users-backdrop">
+      <div class="modal-dialog" style="max-width: 820px;" role="dialog" aria-modal="true" aria-labelledby="modal-users-title">
+        <div class="modal-header">
+          <div>
+            <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Identity & Access Governance</span>
+            <h3 id="modal-users-title" style="margin: 2px 0 0 0; font-size: 18px; font-weight: 800;">
+              👥 Campus User Directory & Staff Provisioning
+            </h3>
+          </div>
+          <button class="btn-icon" id="btn-close-users-modal" aria-label="Close" type="button">✕</button>
+        </div>
+
+        <div style="padding: 16px 20px;">
+          <!-- Tabs Navigation -->
+          <div class="filter-tabs" style="margin-bottom: 16px;">
+            <button type="button" class="filter-tab active" id="tab-manage-staff">Institutional Staff</button>
+            <button type="button" class="filter-tab" id="tab-manage-students">Enrolled Students</button>
+            <button type="button" class="filter-tab" id="tab-provision-user">➕ Provision Staff Account</button>
+          </div>
+
+          <!-- Section 1: Staff Directory -->
+          <div id="view-users-staff">
+            <div class="state-container"><div class="spinner"></div></div>
+          </div>
+
+          <!-- Section 2: Student Directory -->
+          <div id="view-users-students" style="display: none;">
+            <div class="state-container"><div class="spinner"></div></div>
+          </div>
+
+          <!-- Section 3: Provision User Form -->
+          <div id="view-users-provision" style="display: none;">
+            <form id="form-provision-staff" autocomplete="off">
+              <div id="provision-alert" class="form-alert error" style="display: none; margin-bottom: 12px;"></div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group">
+                  <label class="form-label" for="prov-role">Institutional Role *</label>
+                  <select id="prov-role" class="form-input" required>
+                    <option value="WARDEN">Hostel Warden (WARDEN)</option>
+                    <option value="TEACHER">Faculty / Teacher (TEACHER)</option>
+                    <option value="GUARD">Security Guard (GUARD)</option>
+                    <option value="STAFF">Maintenance Supervisor (STAFF)</option>
+                    <option value="LAB_ASSISTANT">Laboratory Assistant (LAB_ASSISTANT)</option>
+                    <option value="HOSTEL_FACULTY">Hostel Affairs Faculty (HOSTEL_FACULTY)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="prov-email">Institutional Email *</label>
+                  <input type="email" id="prov-email" class="form-input" placeholder="staff@campusflow.edu" required />
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group">
+                  <label class="form-label" for="prov-fname">First Name *</label>
+                  <input type="text" id="prov-fname" class="form-input" placeholder="e.g. Sunil" required />
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="prov-lname">Last Name *</label>
+                  <input type="text" id="prov-lname" class="form-input" placeholder="e.g. Sharma" required />
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group">
+                  <label class="form-label" for="prov-phone">Phone Number (10 digits) *</label>
+                  <input type="tel" id="prov-phone" class="form-input" placeholder="9876543210" required />
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="prov-pwd">Temporary Password (min 8 chars) *</label>
+                  <input type="password" id="prov-pwd" class="form-input" placeholder="Secure password" minlength="8" required />
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group">
+                  <label class="form-label" for="prov-dept">Department / Division *</label>
+                  <input type="text" id="prov-dept" class="form-input" placeholder="e.g. Hostel Administration" required />
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="prov-desig">Official Designation</label>
+                  <input type="text" id="prov-desig" class="form-input" placeholder="e.g. Chief Warden (Block B)" />
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px;">
+                <button type="button" class="btn btn-outline" id="btn-cancel-provision">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="btn-submit-provision">
+                  <span>Create Staff Account</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const closeModal = () => { modalRoot.innerHTML = ""; };
+  document.getElementById("btn-close-users-modal")?.addEventListener("click", closeModal);
+  document.getElementById("btn-cancel-provision")?.addEventListener("click", () => {
+    switchTab("staff");
+  });
+
+  const tabStaff = document.getElementById("tab-manage-staff");
+  const tabStudents = document.getElementById("tab-manage-students");
+  const tabProvision = document.getElementById("tab-provision-user");
+  const viewStaff = document.getElementById("view-users-staff");
+  const viewStudents = document.getElementById("view-users-students");
+  const viewProvision = document.getElementById("view-users-provision");
+
+  const switchTab = (tab) => {
+    tabStaff?.classList.toggle("active", tab === "staff");
+    tabStudents?.classList.toggle("active", tab === "students");
+    tabProvision?.classList.toggle("active", tab === "provision");
+
+    if (viewStaff) viewStaff.style.display = tab === "staff" ? "block" : "none";
+    if (viewStudents) viewStudents.style.display = tab === "students" ? "block" : "none";
+    if (viewProvision) viewProvision.style.display = tab === "provision" ? "block" : "none";
+  };
+
+  tabStaff?.addEventListener("click", () => switchTab("staff"));
+  tabStudents?.addEventListener("click", () => switchTab("students"));
+  tabProvision?.addEventListener("click", () => switchTab("provision"));
+
+  // Load staff records
+  const loadStaff = async () => {
+    if (!viewStaff) return;
+    try {
+      const staff = await api.get("/api/v1/admin/staff");
+      CACHED_STAFF = staff;
+      if (staff.length === 0) {
+        viewStaff.innerHTML = `
+          <div class="card" style="padding: 30px; text-align: center;">
+            <div style="font-size: 24px;">👤</div>
+            <div style="font-weight: 700; margin-top: 4px;">No institutional staff provisioned yet</div>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+              Use the "Provision Staff Account" tab to onboard Wardens, Teachers, Guards, and Maintenance Staff.
+            </div>
+          </div>
+        `;
+        return;
+      }
+      viewStaff.innerHTML = `
+        <div class="table-container" style="max-height: 380px; overflow-y: auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Department</th>
+                <th>Designation</th>
+                <th>Email</th>
+                <th>Phone</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${staff.map(s => `
+                <tr>
+                  <td><strong>${escapeHtml(s.full_name)}</strong></td>
+                  <td><span class="status-badge info" style="font-size: 10px;">${escapeHtml(s.role)}</span></td>
+                  <td>${escapeHtml(s.department || 'Campus')}</td>
+                  <td>${escapeHtml(s.designation || 'Staff')}</td>
+                  <td><code style="font-size: 11px;">${escapeHtml(s.email)}</code></td>
+                  <td>${escapeHtml(s.phone)}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } catch (err) {
+      viewStaff.innerHTML = `<div class="card" style="padding: 20px; color: var(--error);">Failed to load staff: ${escapeHtml(err.message)}</div>`;
+    }
+  };
+
+  // Load student records
+  const loadStudents = async () => {
+    if (!viewStudents) return;
+    try {
+      const students = await api.get("/api/v1/admin/students");
+      if (students.length === 0) {
+        viewStudents.innerHTML = `
+          <div class="card" style="padding: 30px; text-align: center;">
+            <div style="font-size: 24px;">🎓</div>
+            <div style="font-weight: 700; margin-top: 4px;">No students enrolled yet</div>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+              Students can self-register using the "Student Registration" tab on the sign-in page.
+            </div>
+          </div>
+        `;
+        return;
+      }
+      viewStudents.innerHTML = `
+        <div class="table-container" style="max-height: 380px; overflow-y: auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>College Roll No</th>
+                <th>Univ Reg No</th>
+                <th>Full Name</th>
+                <th>Branch & Batch</th>
+                <th>Accommodation</th>
+                <th>Hostel Details</th>
+                <th>Email & Contact</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${students.map(st => {
+                const isHosteler = st.accommodation_type === 'HOSTELER' || st.accommodation_type === 'Hosteler';
+                return `
+                <tr>
+                  <td><code style="font-weight: 700;">${escapeHtml(st.college_roll_number || st.roll_number)}</code></td>
+                  <td><code style="font-size: 11px;">${escapeHtml(st.university_reg_number || '—')}</code></td>
+                  <td><strong>${escapeHtml(st.full_name)}</strong></td>
+                  <td>${escapeHtml(st.department)} (${st.batch_year}, Sec ${escapeHtml(st.section)})</td>
+                  <td>
+                    <span class="status-badge ${isHosteler ? 'info' : 'approved'}" style="font-size: 10px;">
+                      ${isHosteler ? '🏢 Hosteler' : '🏡 Day Scholar'}
+                    </span>
+                  </td>
+                  <td>
+                    ${isHosteler 
+                      ? `${escapeHtml(st.hostel_name || 'Hostel')}${st.hostel_block ? ` • ${escapeHtml(st.hostel_block)}` : ''}${st.room_number ? ` • Room ${escapeHtml(st.room_number)}` : ''}`
+                      : '<span style="color: var(--text-muted);">— (Day Scholar)</span>'
+                    }
+                  </td>
+                  <td>
+                    <code style="font-size: 11px;">${escapeHtml(st.email)}</code><br/>
+                    <span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(st.phone_number || st.phone || '')}</span>
+                  </td>
+                </tr>
+              `;}).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } catch (err) {
+      viewStudents.innerHTML = `<div class="card" style="padding: 20px; color: var(--error);">Failed to load students: ${escapeHtml(err.message)}</div>`;
+    }
+  };
+
+  // Handle provision form submit
+  const formProvision = document.getElementById("form-provision-staff");
+  formProvision?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const alertEl = document.getElementById("provision-alert");
+    const btn = document.getElementById("btn-submit-provision");
+    if (alertEl) alertEl.style.display = "none";
+    btn.disabled = true;
+
+    const payload = {
+      role: document.getElementById("prov-role").value,
+      email: document.getElementById("prov-email").value.trim(),
+      first_name: document.getElementById("prov-fname").value.trim(),
+      last_name: document.getElementById("prov-lname").value.trim(),
+      phone_number: document.getElementById("prov-phone").value.trim(),
+      password: document.getElementById("prov-pwd").value,
+      department: document.getElementById("prov-dept").value.trim(),
+      designation: document.getElementById("prov-desig").value.trim() || null
+    };
+
+    try {
+      await api.post("/api/v1/admin/users", payload);
+      showToast(`Provisioned account for ${payload.first_name} ${payload.last_name} (${payload.role})`, "success");
+      CACHED_STAFF = []; // Invalidate staff cache
+      formProvision.reset();
+      switchTab("staff");
+      await loadStaff();
+      if (onSuccess) onSuccess();
+    } catch (err) {
+      if (alertEl) {
+        alertEl.textContent = err.message || "Failed to provision staff account.";
+        alertEl.style.display = "block";
+      }
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  loadStaff();
+  loadStudents();
 }

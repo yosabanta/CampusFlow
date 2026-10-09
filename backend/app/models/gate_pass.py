@@ -98,6 +98,33 @@ class GatePass(Base):
         "GatePassQRToken", back_populates="gate_pass", uselist=False, cascade="all, delete-orphan"
     )
 
+    @property
+    def student_name(self) -> Optional[str]:
+        if self.student and self.student.user:
+            return f"{self.student.user.first_name} {self.student.user.last_name}".strip()
+        return None
+
+    @property
+    def student_roll(self) -> Optional[str]:
+        return self.student.roll_number if self.student else None
+
+    @property
+    def student_department(self) -> Optional[str]:
+        return self.student.department if self.student else None
+
+    @property
+    def student_room(self) -> Optional[str]:
+        return self.student.room_number if self.student else None
+
+    @property
+    def student_hostel(self) -> Optional[str]:
+        return self.student.hostel.name if self.student and self.student.hostel else None
+
+    @property
+    def student_phone(self) -> Optional[str]:
+        return self.student.user.phone_number if self.student and self.student.user else None
+
+
 
 class GatePassQRToken(Base):
     """

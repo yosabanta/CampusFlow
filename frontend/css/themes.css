@@ -2,41 +2,81 @@
    CAMPUSFLOW MVP — THEMES (LIGHT, DARK, PREFERS-CONTRAST)
    ============================================================================== */
 
-/* Dark Theme (Graphite Canvas, Deep Slate Surfaces) */
+/* Dark Theme (Night Violet Canvas #1E1033, Elevated Dark Surfaces) */
 [data-theme="dark"] {
-  --primary: #3B82F6;
-  --primary-hover: #60A5FA;
-  --primary-subtle: #1E293B;
-  --primary-text: #93C5FD;
-  --secondary: #F8FAFC;
-  --secondary-hover: #E2E8F0;
-  --accent: #34D399;
-  --accent-subtle: #064E3B;
+  --background: var(--color-night-violet);
+  --surface: #23202E;
+  --surface-primary: #23202E;
+  --surface-subtle: #2C2638;
+  --surface-elevated: #322A42;
+  --surface-featured: #36224A;
+  --surface-tint-violet: #2A1D3D;
+  --surface-dark: #161024;
+  --surface-night: #0F081B;
+  --surface-hover: #373047;
+  --surface-active: #443B57;
 
-  --background: #0B0F19;
-  --surface: #151D2E;
-  --surface-elevated: #1B2438;
-  --surface-hover: #222D46;
-  --surface-active: #2C3955;
+  --sidebar-bg: #140B24;
+  --sidebar-header-bg: #0D0718;
+  --sidebar-text: var(--color-porcelain);
+  --sidebar-text-muted: #9E9EB2;
+  --sidebar-hover: rgba(255, 255, 255, 0.08);
+  --sidebar-active-bg: linear-gradient(135deg, var(--color-signal-blue) 0%, var(--color-ultra-violet) 100%);
+  --sidebar-border: rgba(255, 255, 255, 0.12);
 
-  --text: #F8FAFC;
-  --text-secondary: #CBD5E1;
-  --text-muted: #94A3B8;
-  --text-inverse: #0F172A;
+  --primary: var(--color-signal-blue);
+  --primary-hover: #2970FF;
+  --primary-subtle: rgba(0, 87, 255, 0.18);
+  --primary-text: #66A3FF;
 
-  --border: #2A364F;
-  --border-subtle: #1E283D;
-  --border-focus: #3B82F6;
+  --secondary-action: var(--color-ultra-violet);
+  --secondary-action-hover: #862BFF;
+  --secondary-action-subtle: rgba(106, 0, 244, 0.22);
 
-  --success: #10B981;
-  --success-bg: #064E3B;
-  --success-border: #047857;
+  --action-nav: var(--color-signal-blue);
+  --action-submit: var(--color-ultra-violet);
+  --action-verify: #34D399;
+  --action-urgent: var(--color-dragonfruit);
+  --action-attention: var(--color-butter-yellow);
+  --action-live: var(--color-lime-spark);
+
+  --secondary: var(--color-porcelain);
+  --secondary-hover: #E8E7E4;
+
+  --text: var(--color-porcelain);
+  --text-secondary: #CBD2DE;
+  --text-muted: #8E95A5;
+  --text-inverse: var(--color-graphite);
+
+  --border: #3D374D;
+  --border-subtle: #2E283B;
+  --border-focus: var(--color-signal-blue);
+
+  /* Semantic status tokens in dark mode */
+  --success: #34D399;
+  --success-bg: rgba(6, 78, 59, 0.55);
+  --success-border: rgba(52, 211, 153, 0.45);
   --success-text: #A7F3D0;
 
-  --warning: #F59E0B;
-  --warning-bg: #451A03;
-  --warning-border: #B45309;
-  --warning-text: #FDE68A;
+  --important: var(--color-butter-yellow);
+  --important-bg: rgba(255, 242, 117, 0.18);
+  --important-border: rgba(255, 242, 117, 0.45);
+  --important-text: var(--color-butter-yellow);
+
+  --warning: var(--color-soft-apricot);
+  --warning-bg: rgba(255, 214, 165, 0.18);
+  --warning-border: rgba(255, 214, 165, 0.45);
+  --warning-text: var(--color-soft-apricot);
+
+  --live-accent: var(--color-lime-spark);
+  --live-bg: rgba(182, 255, 46, 0.18);
+  --live-border: rgba(182, 255, 46, 0.55);
+  --live-text: var(--color-lime-spark);
+
+  --special-accent: var(--color-dragonfruit);
+  --special-bg: rgba(255, 70, 150, 0.18);
+  --special-border: rgba(255, 70, 150, 0.55);
+  --special-text: var(--color-dragonfruit);
 
   --error: #EF4444;
   --error-bg: #450A0A;
@@ -53,6 +93,91 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.7);
   --shadow-dropdown: 0 16px 28px -4px rgba(0, 0, 0, 0.75);
+}
+
+/* ==============================================================================
+   DARK MODE PROPER COMPONENT OVERRIDES (Mandatory Item 11)
+   No blinding white/pastel blocks inside dark dashboard
+   ============================================================================== */
+[data-theme="dark"] .card-porcelain {
+  background-color: #271E36 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: var(--color-porcelain) !important;
+}
+
+[data-theme="dark"] .card-champagne {
+  background-color: #2B1C3B !important;
+  border: 1px solid rgba(52, 211, 153, 0.35) !important;
+  color: #F8E7C9 !important;
+}
+[data-theme="dark"] .card-champagne .card-title,
+[data-theme="dark"] .card-champagne div {
+  color: #A7F3D0 !important;
+}
+
+[data-theme="dark"] .card-apricot {
+  background-color: #351F2D !important;
+  border: 1px solid rgba(255, 214, 165, 0.35) !important;
+  color: #FFD6A5 !important;
+}
+[data-theme="dark"] .card-apricot .card-title,
+[data-theme="dark"] .card-apricot div {
+  color: #FFD6A5 !important;
+}
+
+[data-theme="dark"] .card-butter {
+  background-color: #31281A !important;
+  border: 1px solid rgba(255, 242, 117, 0.35) !important;
+  color: #FFF275 !important;
+}
+[data-theme="dark"] .card-butter .card-title,
+[data-theme="dark"] .card-butter div {
+  color: #FFF275 !important;
+}
+
+[data-theme="dark"] .card-status-pending {
+  background-color: #2D2028 !important;
+  border-color: rgba(255, 214, 165, 0.4) !important;
+  border-left: 4px solid var(--color-soft-apricot) !important;
+}
+
+[data-theme="dark"] .card-status-resolved {
+  background-color: #1A2824 !important;
+  border-color: rgba(52, 211, 153, 0.4) !important;
+  border-left: 4px solid #34D399 !important;
+}
+
+[data-theme="dark"] .card-status-urgent {
+  background-color: #321827 !important;
+  border-color: rgba(255, 70, 150, 0.4) !important;
+  border-left: 4px solid var(--color-dragonfruit) !important;
+}
+
+[data-theme="dark"] .app-header {
+  background-color: #170C28 !important;
+  border-bottom: 1px solid rgba(106, 0, 244, 0.35) !important;
+}
+
+[data-theme="dark"] .login-card {
+  background-color: #23202E !important;
+  border-color: #3D374D !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6) !important;
+}
+
+[data-theme="dark"] .data-table th {
+  background-color: #160B24 !important;
+  color: var(--color-porcelain) !important;
+  border-bottom: 2px solid var(--color-ultra-violet) !important;
+}
+
+[data-theme="dark"] .data-table tbody tr {
+  background-color: #23202E !important;
+}
+[data-theme="dark"] .data-table tbody tr:nth-child(even) {
+  background-color: #2B2638 !important;
+}
+[data-theme="dark"] .data-table tbody tr:hover {
+  background-color: #362E45 !important;
 }
 
 /* Reduced Motion Support */

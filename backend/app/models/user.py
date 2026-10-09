@@ -71,6 +71,12 @@ class Student(Base):
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
     roll_number: Mapped[str] = mapped_column(String(30), unique=True, index=True, nullable=False)
+    university_reg_number: Mapped[Optional[str]] = mapped_column(
+        String(50), unique=True, index=True, nullable=True
+    )
+    accommodation_type: Mapped[str] = mapped_column(
+        String(20), default="DAY_SCHOLAR", nullable=False
+    )
     department: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
     batch_year: Mapped[int] = mapped_column(Integer, nullable=False)
     semester: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -78,10 +84,16 @@ class Student(Base):
     hostel_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         Uuid, ForeignKey("hostels.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    hostel_block: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     room_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     dues_cleared: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     has_smartphone: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     parent_phone: Mapped[Optional[str]] = mapped_column(String(15), nullable=True)
+
+    @property
+    def college_roll_number(self) -> str:
+        """Alias for college roll number."""
+        return self.roll_number
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="student_profile")

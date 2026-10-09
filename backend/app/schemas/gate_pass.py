@@ -21,8 +21,8 @@ class GatePassDecisionRequest(BaseModel):
 
 
 class QRVerifyRequest(BaseModel):
-    """Payload when Security Guard scans a student's perimeter QR token."""
-    qr_token: str = Field(..., min_length=10, max_length=64)
+    """Payload when Security Guard scans a student's perimeter QR token or enters identifier manually."""
+    qr_token: str = Field(..., min_length=4, max_length=64)
 
 
 class GatePassQRTokenResponse(BaseModel):
@@ -60,3 +60,9 @@ class GatePassResponse(BaseModel):
     pin_code: str
     created_at: datetime
     qr_token: Optional[GatePassQRTokenResponse] = None
+    student_name: Optional[str] = None
+    student_roll: Optional[str] = None
+    student_department: Optional[str] = None
+    student_room: Optional[str] = None
+    student_hostel: Optional[str] = None
+    student_phone: Optional[str] = None

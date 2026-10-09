@@ -133,9 +133,9 @@ async function loadStaffDashboardData(user) {
           <div style="font-size: 12px; color: var(--text-secondary);">Assigned / Pending start</div>
         </div>
 
-        <div class="card" style="padding: 16px; border-left: 4px solid #3B82F6;">
+        <div class="card" style="padding: 16px; border-left: 4px solid var(--color-signal-blue);">
           <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">In Progress</div>
-          <div style="font-size: 26px; font-weight: 800; color: #3B82F6; margin: 6px 0;">${inProgressCount}</div>
+          <div style="font-size: 26px; font-weight: 800; color: var(--color-signal-blue); margin: 6px 0;">${inProgressCount}</div>
           <div style="font-size: 12px; color: var(--text-secondary);">Currently being serviced</div>
         </div>
 
@@ -513,8 +513,8 @@ function openStaffComplaintDetailModal(complaint, onUpdated) {
 
           <!-- Student Satisfaction Rating (if closed) -->
           ${complaint.rating ? `
-            <div class="card" style="padding: 12px; margin-bottom: 16px; background: #FEF3C7; border: 1px solid #F59E0B;">
-              <div style="font-size: 12px; font-weight: 700; color: #92400E;">
+            <div class="card card-butter" style="padding: 12px; margin-bottom: 16px;">
+              <div style="font-size: 12px; font-weight: 700; color: var(--color-graphite);">
                 ★ Student Feedback Rating: ${complaint.rating}/5 Stars
               </div>
             </div>
@@ -638,12 +638,119 @@ async function updateStaffComplaintStatus(complaintId, newStatus, notes, onSucce
    PART B: SECURITY GUARD GATE PASS WORKSTATION (GUARD)
    ========================================================================== */
 
+// Module-level guard camera state
+let guardCameraStream = null;
+let guardScanAnimationId = null;
+
+function stopGuardCamera() {
+  if (guardCameraStream) {
+    try {
+      guardCameraStream.getTracks().forEach(track => track.stop());
+    } catch (e) {
+      console.warn("Error stopping camera tracks:", e);
+    }
+    guardCameraStream = null;
+  }
+  if (guardScanAnimationId) {
+    cancelAnimationFrame(guardScanAnimationId);
+    guardScanAnimationId = null;
+  }
+  const container = document.getElementById("guard-camera-container");
+  const toggleBtn = document.getElementById("btn-toggle-camera");
+  const statusEl = document.getElementById("guard-camera-status");
+
+  if (container) container.style.display = "none";
+  if (toggleBtn) {
+    toggleBtn.innerHTML = "📹 Open Camera Scanner";
+    toggleBtn.className = "btn btn-primary btn-sm";
+  }
+  if (statusEl) {
+    statusEl.innerHTML = `Camera standby. Click above to open camera or enter pass identifier manually below.`;
+  }
+}
+
+async function startGuardCamera() {
+  const container = document.getElementById("guard-camera-container");
+  const video = document.getElementById("guard-camera-preview");
+  const toggleBtn = document.getElementById("btn-toggle-camera");
+  const statusEl = document.getElementById("guard-camera-status");
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    if (statusEl) {
+      statusEl.innerHTML = `<span style="color: var(--error);">Camera API not supported on this device/browser. Please use manual entry below.</span>`;
+    }
+    return;
+  }
+
+  try {
+    if (statusEl) statusEl.textContent = "Requesting camera permissions...";
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    guardCameraStream = stream;
+    if (video) {
+      video.srcObject = stream;
+      await video.play();
+    }
+    if (container) container.style.display = "block";
+    if (toggleBtn) {
+      toggleBtn.innerHTML = "🛑 Stop Camera";
+      toggleBtn.className = "btn btn-danger btn-sm";
+    }
+    if (statusEl) {
+      statusEl.innerHTML = `<span style="color: var(--success); font-weight: 700;">🟢 Camera active — point lens at student QR code</span>`;
+    }
+
+    let barcodeDetector = null;
+    if ("BarcodeDetector" in window) {
+      try {
+        barcodeDetector = new window.BarcodeDetector({ formats: ["qr_code"] });
+      } catch (e) {
+        console.warn("BarcodeDetector initialization note:", e);
+      }
+    }
+
+    async function scanLoop() {
+      if (!guardCameraStream) return;
+      if (video && video.readyState >= 2 && barcodeDetector) {
+        try {
+          const barcodes = await barcodeDetector.detect(video);
+          if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+            const scannedToken = barcodes[0].rawValue.trim();
+            stopGuardCamera();
+            const input = document.getElementById("guard-qr-token-input");
+            if (input) input.value = scannedToken;
+            showToast("QR code detected! Validating...", "info");
+            await executeGuardQRVerification(scannedToken);
+            return;
+          }
+        } catch (frameErr) {
+          // ignore frame read errors
+        }
+      }
+      guardScanAnimationId = requestAnimationFrame(scanLoop);
+    }
+
+    guardScanAnimationId = requestAnimationFrame(scanLoop);
+
+  } catch (err) {
+    console.error("Camera access error:", err);
+    if (statusEl) {
+      statusEl.innerHTML = `<span style="color: var(--error);">Camera unavailable (${escapeHtml(err.message || 'permission denied')}). Use manual pass entry below.</span>`;
+    }
+    stopGuardCamera();
+  }
+}
+
 /**
  * Render the Security Guard Gate Verification Scanner Workstation
  * Optimized for low-end mobile screens, large touch targets (>=44px), high contrast, rapid operation.
  */
 export async function renderGuardScanner(mainEl, user) {
   if (!mainEl) return;
+
+  // Clean up any existing stream before re-rendering
+  stopGuardCamera();
 
   mainEl.innerHTML = `
     <div style="max-width: 680px; margin: 0 auto;">
@@ -660,13 +767,45 @@ export async function renderGuardScanner(mainEl, user) {
         </p>
       </div>
 
+      <!-- Optical Camera QR Scanner Component -->
+      <div class="card" style="padding: 16px; margin-bottom: 16px; border: 2px dashed var(--border); background: var(--surface);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <div style="font-size: 14px; font-weight: 800; color: var(--text);">
+              📷 Optical Camera QR Scanner
+            </div>
+            <div id="guard-camera-status" style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+              Camera standby. Click button to activate physical camera feed.
+            </div>
+          </div>
+          <button
+            class="btn btn-primary btn-sm"
+            id="btn-toggle-camera"
+            type="button"
+            style="min-height: 40px; font-weight: 700; padding: 6px 14px;"
+          >
+            📹 Open Camera Scanner
+          </button>
+        </div>
+
+        <div id="guard-camera-container" style="display: none; position: relative; border-radius: var(--radius-sm); overflow: hidden; background: #000; margin-top: 8px;">
+          <video id="guard-camera-preview" playsinline autoplay muted style="width: 100%; max-height: 280px; object-fit: cover; display: block;"></video>
+          <!-- Reticle Scanner Overlay -->
+          <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 180px; height: 180px; border: 3px solid var(--color-lime-spark); box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4); border-radius: 12px; pointer-events: none; display: flex; align-items: center; justify-content: center;">
+            <div style="font-size: 10px; font-weight: 700; color: #fff; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px;">
+              Align QR Code
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Live Verification Input Card -->
-      <div class="card" style="padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+      <div class="card" style="padding: 20px; margin-bottom: 20px; border: 2px solid var(--color-emerald-ink); border-top: 5px solid var(--color-lime-spark); box-shadow: 0 4px 16px rgba(6, 78, 59, 0.12);">
         <form id="form-guard-verify-qr">
           <div class="form-group" style="margin-bottom: 16px;">
             <label class="form-label" for="guard-qr-token-input" style="font-size: 13px; font-weight: 800; display: flex; justify-content: space-between;">
-              <span>🔑 Single-Use QR Token / Pass Code</span>
-              <span style="font-size: 11px; font-weight: normal; color: var(--text-muted);">Cryptographic Hash</span>
+              <span>🔑 Single-Use QR Token or Pass Identifier</span>
+              <span style="font-size: 11px; font-weight: normal; color: var(--text-muted);">Pass # / PIN / Token</span>
             </label>
             <div style="position: relative;">
               <input
@@ -677,8 +816,8 @@ export async function renderGuardScanner(mainEl, user) {
                 autocorrect="off"
                 spellcheck="false"
                 required
-                placeholder="Scan or enter 64-char QR token..."
-                style="font-family: var(--font-family-mono); font-size: 15px; font-weight: 700; padding: 14px 44px 14px 14px; min-height: 52px; border-width: 2px;"
+                placeholder="Scan QR or enter Pass # (GP-2026-...), PIN, or 64-char token..."
+                style="font-family: var(--font-family-mono); font-size: 14px; font-weight: 700; padding: 14px 44px 14px 14px; min-height: 52px; border-width: 2px;"
               >
               <button
                 class="btn-icon"
@@ -692,7 +831,7 @@ export async function renderGuardScanner(mainEl, user) {
 
           <!-- Big Touch Target Primary Verification Button (>=48px) -->
           <button
-            class="btn btn-primary"
+            class="btn btn-success"
             id="btn-submit-verify-qr"
             type="submit"
             style="width: 100%; min-height: 54px; font-size: 16px; font-weight: 800; letter-spacing: 0.5px; border-radius: var(--radius-md);"
@@ -733,6 +872,15 @@ export async function renderGuardScanner(mainEl, user) {
       </div>
     </div>
   `;
+
+  // Attach camera toggle button
+  document.getElementById("btn-toggle-camera")?.addEventListener("click", () => {
+    if (guardCameraStream) {
+      stopGuardCamera();
+    } else {
+      startGuardCamera();
+    }
+  });
 
   // Attach clear button
   document.getElementById("btn-clear-qr-input")?.addEventListener("click", () => {

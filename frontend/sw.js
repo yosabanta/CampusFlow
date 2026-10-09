@@ -3,7 +3,7 @@
  * Enables offline application shell loading on low-bandwidth campus networks
  */
 
-const CACHE_NAME = "campusflow-shell-v3";
+const CACHE_NAME = "campusflow-shell-v5";
 
 const APP_SHELL_ASSETS = [
   "./",
@@ -63,7 +63,7 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Fetch: Cache-first for local static shell, strictly Network-only for private APIs
+// Fetch: Cache-first for remote PWA shell, strictly Network-first for localhost dev and APIs
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
@@ -73,7 +73,23 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Cache-first for application shell assets with network fallback
+  // Network-first on localhost so development changes are immediately visible
+  if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === "basic") {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Cache-first for production offline shell assets with network fallback
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {

@@ -62,3 +62,6 @@ class ComplaintResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     attachments: List[ComplaintAttachmentResponse] = []
+    student_name: Optional[str] = None
+    student_roll: Optional[str] = None
+    assigned_staff_name: Optional[str] = None

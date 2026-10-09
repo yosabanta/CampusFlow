@@ -19,14 +19,14 @@
 }
 
 .data-table th {
-  padding: 10px 14px;
-  background-color: var(--surface-hover);
-  color: var(--text-muted);
+  padding: 11px 14px;
+  background-color: var(--color-graphite);
+  color: var(--color-porcelain);
   font-weight: var(--font-bold);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-size: 11px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 2px solid var(--color-ultra-violet);
   white-space: nowrap;
 }
 
@@ -35,6 +35,15 @@
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text);
   vertical-align: middle;
+}
+
+.data-table tbody tr {
+  background-color: var(--surface);
+  transition: background-color var(--transition-fast);
+}
+
+.data-table tbody tr:nth-child(even) {
+  background-color: var(--surface-subtle);
 }
 
 .data-table tbody tr:last-child td {

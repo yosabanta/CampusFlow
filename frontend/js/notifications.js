@@ -75,22 +75,36 @@ export function renderNotificationList(notifications) {
     return;
   }
 
-  body.innerHTML = notifications.map(n => `
-    <div class="notification-item ${n.is_read ? 'read' : 'unread'}" data-id="${escapeHtml(n.id)}">
-      <div class="notification-item-header">
-        <span class="notification-item-title">${escapeHtml(n.title)}</span>
-        <span class="notification-item-time">${timeAgo(n.created_at)}</span>
-      </div>
-      <div class="notification-item-msg">${escapeHtml(n.message)}</div>
-      ${!n.is_read ? `
-        <div class="notification-item-actions">
-          <button class="btn-mark-read" data-action="mark-read" data-id="${escapeHtml(n.id)}" type="button">
-            ✓ Mark as read
-          </button>
+  body.innerHTML = notifications.map(n => {
+    let priorityClass = "normal";
+    const p = (n.priority || "").toUpperCase();
+    const titleLower = (n.title || "").toLowerCase();
+    const msgLower = (n.message || "").toLowerCase();
+    if (p === "URGENT" || titleLower.includes("urgent") || titleLower.includes("emergency") || titleLower.includes("alert")) {
+      priorityClass = "urgent";
+    } else if (p === "HIGH" || titleLower.includes("important") || titleLower.includes("fee") || titleLower.includes("deadline") || titleLower.includes("night")) {
+      priorityClass = "important";
+    } else if (titleLower.includes("approved") || titleLower.includes("resolved") || titleLower.includes("success") || titleLower.includes("verified")) {
+      priorityClass = "success";
+    }
+
+    return `
+      <div class="notification-item ${n.is_read ? 'read' : 'unread'} ${priorityClass}" data-id="${escapeHtml(n.id)}">
+        <div class="notification-item-header">
+          <span class="notification-item-title">${escapeHtml(n.title)}</span>
+          <span class="notification-item-time">${timeAgo(n.created_at)}</span>
         </div>
-      ` : ''}
-    </div>
-  `).join("");
+        <div class="notification-item-msg">${escapeHtml(n.message)}</div>
+        ${!n.is_read ? `
+          <div class="notification-item-actions">
+            <button class="btn-mark-read" data-action="mark-read" data-id="${escapeHtml(n.id)}" type="button">
+              ✓ Mark as read
+            </button>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join("");
 
   // Attach mark-read handlers
   body.querySelectorAll('[data-action="mark-read"]').forEach(btn => {

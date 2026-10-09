@@ -11,11 +11,50 @@ from app.schemas.attendance import (
     AttendanceSessionResponse,
     AttendanceRecordCreate,
     AttendanceRecordResponse,
-    StudentAttendanceSummary
+    StudentAttendanceSummary,
+    StudentRosterItem
 )
 from app.services import attendance_service
 
 router = APIRouter()
+
+
+@router.get(
+    "/sessions",
+    response_model=List[AttendanceSessionResponse],
+    dependencies=[Depends(RequireRole(UserRole.TEACHER, UserRole.ADMIN))]
+)
+def list_sessions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Retrieve attendance sessions conducted by the current teacher (or all for admin).
+    """
+    return attendance_service.get_teacher_sessions(db=db, teacher=current_user)
+
+
+@router.get(
+    "/roster",
+    response_model=List[StudentRosterItem],
+    dependencies=[Depends(RequireRole(UserRole.TEACHER, UserRole.ADMIN))]
+)
+def get_cohort_roster(
+    branch: Optional[str] = None,
+    batch_year: Optional[int] = None,
+    section: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieve real cohort student roster from the database for roll-call attendance.
+    """
+    return attendance_service.get_cohort_roster(
+        db=db,
+        branch=branch,
+        batch_year=batch_year,
+        section=section
+    )
+
 
 
 @router.post(
@@ -86,6 +125,10 @@ def get_session(
 
 @router.get(
     "/my-attendance",
+    response_model=StudentAttendanceSummary
+)
+@router.get(
+    "/summary",
     response_model=StudentAttendanceSummary
 )
 def get_my_attendance(

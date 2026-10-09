@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,11 +30,26 @@ class Settings(BaseSettings):
     # SMS Provider Mode ('mock', 'console', 'live')
     SMS_PROVIDER_MODE: str = "console"
 
+    # Twilio Verify Service Configuration
+    TWILIO_ACCOUNT_SID: Optional[str] = None
+    TWILIO_AUTH_TOKEN: Optional[str] = None
+    TWILIO_VERIFY_SERVICE_SID: Optional[str] = None
+
+    # Demo & Non-Production Features
+    ENABLE_QUICK_DEMO_LOGIN: bool = True
+    ENABLE_DEMO_OTP_FALLBACK: bool = False
+
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env"),
         env_file_encoding="utf-8",
         extra="ignore"
     )
+
+    @property
+    def is_quick_demo_login_allowed(self) -> bool:
+        """Quick demo login is strictly disabled in production environments."""
+        return self.ENABLE_QUICK_DEMO_LOGIN and self.ENVIRONMENT.strip().lower() != "production"
+
 
     @property
     def cors_origins(self) -> List[str]:

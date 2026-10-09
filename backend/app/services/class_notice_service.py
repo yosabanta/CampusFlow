@@ -61,23 +61,24 @@ def get_class_notices(
 ) -> List[ClassNotice]:
     """
     Retrieve class notices.
-    If student, filters to only notices matching the student's cohort.
+    If student, strictly filters to only notices matching the student's cohort.
     If teacher/admin, returns all or filtered by query parameters.
     """
     query = db.query(ClassNotice)
 
     if user.role == UserRole.STUDENT:
         student = db.query(Student).filter(Student.id == user.id).first()
-        if student:
-            query = query.filter(
-                (ClassNotice.target_branch.ilike(student.department)) | (ClassNotice.target_branch == "ALL"),
-                (ClassNotice.target_semester == student.semester) | (ClassNotice.target_semester == 0),
-                (ClassNotice.target_section == student.section) | (ClassNotice.target_section == "ALL")
-            )
+        if not student:
+            return []
+        query = query.filter(
+            (ClassNotice.target_branch.ilike(student.department)) | (ClassNotice.target_branch == "ALL"),
+            (ClassNotice.target_semester == student.semester) | (ClassNotice.target_semester == 0),
+            (ClassNotice.target_section.ilike(student.section)) | (ClassNotice.target_section == "ALL")
+        )
     else:
-        if branch:
-            query = query.filter(ClassNotice.target_branch == branch)
-        if section:
-            query = query.filter(ClassNotice.target_section == section)
+        if branch and branch != "ALL":
+            query = query.filter(ClassNotice.target_branch.ilike(branch))
+        if section and section != "ALL":
+            query = query.filter(ClassNotice.target_section.ilike(section))
 
     return query.order_by(ClassNotice.created_at.desc()).all()

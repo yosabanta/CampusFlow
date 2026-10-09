@@ -4,54 +4,127 @@
    ============================================================================== */
 
 :root {
-  /* Brand Palettes (Institutional Trust, Precision Operations) */
-  --primary: #0057FF;
-  --primary-hover: #0045CC;
-  --primary-subtle: #EBF2FF;
-  --primary-text: #003DB8;
-  --secondary: #0F172A;
-  --secondary-hover: #1E293B;
-  --accent: #10B981;
-  --accent-subtle: #ECFDF5;
+  /* --------------------------------------------------------------------------
+     1. EXACT 12-COLOR PALETTE DESIGN TOKENS
+     -------------------------------------------------------------------------- */
+  --color-butter-yellow: #FFF275;
+  --color-royal-iris: #3A0CA3;
+  --color-emerald-ink: #064E3B;
+  --color-champagne: #F8E7C9;
+  --color-lime-spark: #B6FF2E;
+  --color-graphite: #23262F;
+  --color-dragonfruit: #FF4696;
+  --color-night-violet: #1E1033;
+  --color-signal-blue: #0057FF;
+  --color-porcelain: #F8F7F4;
+  --color-ultra-violet: #6A00F4;
+  --color-soft-apricot: #FFD6A5;
 
-  /* Surfaces & Canvas (Light Theme - Porcelain & Crisp White) */
-  --background: #F8F7F4;
-  --surface: #FFFFFF;
-  --surface-elevated: #FFFFFF;
-  --surface-hover: #F1F5F9;
-  --surface-active: #E2E8F0;
+  /* --------------------------------------------------------------------------
+     2. PRIMARY DESIGN SYSTEM SURFACES (60% Neutral, 20% Dark, 10-15% Accent)
+     -------------------------------------------------------------------------- */
+  /* Page Canvas (60% Neutral Porcelain #F8F7F4) */
+  --background: var(--color-porcelain);
+
+  /* Three-Tier Surface Hierarchy (Light Theme) */
+  --surface: #FCFCFA;                    /* Primary warm card surface, distinctly separated from Porcelain */
+  --surface-primary: #FCFCFA;
+  --surface-subtle: #F6F3EB;             /* Subtle alternating row/card tint */
+  --surface-elevated: #F5EFE6;           /* Subtle warm Champagne-tinted elevated surface */
+  --surface-featured: var(--color-champagne); /* Champagne #F8E7C9 */
+  --surface-tint-violet: #F4F0FA;        /* Subtle violet tint */
+  --surface-dark: var(--color-graphite); /* Graphite #23262F */
+  --surface-night: var(--color-night-violet); /* Night Violet #1E1033 */
+  --surface-hover: #F2EDE4;
+  --surface-active: #EAE3D5;
+
+  /* Sidebar & Dark Surfaces (20% Graphite & Night Violet) */
+  --sidebar-bg: var(--color-graphite);
+  --sidebar-header-bg: var(--color-night-violet);
+  --sidebar-text: #E5E9F0;
+  --sidebar-text-muted: #8E95A5;
+  --sidebar-hover: rgba(255, 255, 255, 0.09);
+  --sidebar-active-bg: linear-gradient(135deg, var(--color-signal-blue) 0%, var(--color-ultra-violet) 100%);
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+
+  /* Primary & Diversified Action Color Tokens */
+  --primary: var(--color-signal-blue);
+  --primary-hover: #0045CC;
+  --primary-subtle: rgba(0, 87, 255, 0.08);
+  --primary-text: var(--color-signal-blue);
+
+  --secondary-action: var(--color-ultra-violet);
+  --secondary-action-hover: #5500C7;
+  --secondary-action-subtle: rgba(106, 0, 244, 0.1);
+
+  --action-nav: var(--color-signal-blue);
+  --action-submit: var(--color-ultra-violet);
+  --action-verify: var(--color-emerald-ink);
+  --action-urgent: var(--color-dragonfruit);
+  --action-attention: var(--color-butter-yellow);
+  --action-live: var(--color-lime-spark);
+
+  --secondary: var(--color-graphite);
+  --secondary-hover: #16181E;
 
   /* Typography */
-  --text: #0F172A;
-  --text-secondary: #475569;
-  --text-muted: #64748B;
-  --text-inverse: #FFFFFF;
+  --text: var(--color-graphite);
+  --text-secondary: #525866;
+  --text-muted: #848B9B;
+  --text-inverse: var(--color-porcelain);
 
   /* Borders & Dividers */
-  --border: #E2E8F0;
-  --border-subtle: #EDF2F7;
-  --border-focus: #0057FF;
+  --border: #E5DFD5;
+  --border-subtle: #EFEAE2;
+  --border-focus: var(--color-signal-blue);
 
-  /* Semantic Status Tokens (Accessible & Contrasted) */
-  --success: #059669;
-  --success-bg: #ECFDF5;
-  --success-border: #A7F3D0;
-  --success-text: #065F46;
+  /* --------------------------------------------------------------------------
+     3. SEMANTIC STATUS & ACCENT TOKENS (5-10% Intentional Distribution)
+     -------------------------------------------------------------------------- */
+  /* SUCCESS / VERIFIED: Emerald Ink #064E3B supported by Champagne #F8E7C9 */
+  --success: var(--color-emerald-ink);
+  --success-bg: var(--color-champagne);
+  --success-border: rgba(6, 78, 59, 0.28);
+  --success-text: var(--color-emerald-ink);
 
-  --warning: #D97706;
-  --warning-bg: #FFFBEB;
-  --warning-border: #FDE68A;
-  --warning-text: #92400E;
+  /* IMPORTANT / ATTENTION: Butter Yellow #FFF275 with dark Graphite text */
+  --important: var(--color-butter-yellow);
+  --important-bg: var(--color-butter-yellow);
+  --important-border: #E8DB5B;
+  --important-text: var(--color-graphite);
 
+  /* WARNING / PENDING: Soft Apricot #FFD6A5 with dark Graphite text */
+  --warning: #C26100;
+  --warning-bg: var(--color-soft-apricot);
+  --warning-border: #F7C487;
+  --warning-text: var(--color-graphite);
+
+  /* LIVE / ACTIVE / SPECIAL HIGHLIGHT: Lime Spark #B6FF2E with dark Graphite text */
+  --live-accent: var(--color-lime-spark);
+  --live-bg: rgba(182, 255, 46, 0.22);
+  --live-border: rgba(182, 255, 46, 0.55);
+  --live-text: var(--color-graphite);
+
+  /* NOTIFICATION / SPECIAL / URGENT: Dragonfruit #FF4696 */
+  --special-accent: var(--color-dragonfruit);
+  --special-bg: rgba(255, 70, 150, 0.12);
+  --special-border: rgba(255, 70, 150, 0.35);
+  --special-text: var(--color-dragonfruit);
+
+  /* ERROR / DESTRUCTIVE */
   --error: #DC2626;
   --error-bg: #FEF2F2;
   --error-border: #FECACA;
   --error-text: #991B1B;
 
-  --info: #0284C7;
-  --info-bg: #F0F9FF;
-  --info-border: #BAE6FD;
-  --info-text: #075985;
+  /* INFO: Signal Blue subtle */
+  --info: var(--color-signal-blue);
+  --info-bg: rgba(0, 87, 255, 0.08);
+  --info-border: rgba(0, 87, 255, 0.25);
+  --info-text: var(--color-signal-blue);
+
+  /* PURPLE ACCENT: Royal Iris */
+  --royal-accent: var(--color-royal-iris);
 
   /* Elevation Shadows */
   --shadow-xs: 0 1px 2px 0 rgba(15, 23, 42, 0.04);

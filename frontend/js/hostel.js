@@ -10,51 +10,28 @@ import { showToast } from "./ui.js";
 import { escapeHtml, formatDate, formatDateTime, timeAgo, getGreeting, formatRole } from "./utils.js";
 
 /* --------------------------------------------------------------------------
-   STUDENT DIRECTORY MAPPING (Seed/Institution Reference)
+   DATABASE-BACKED STUDENT METADATA EXTRACTOR
    -------------------------------------------------------------------------- */
-const KNOWN_STUDENTS = {
-  "b84a4d69-d4a7-48e8-a9fa-987d7c38b0da": {
-    name: "Priya Sharma",
-    roll: "2201042",
-    dept: "Computer Science & Engineering",
-    hostel: "Mahanadi Hall of Residence",
-    room: "B-304",
-    phone: "9876543210"
-  },
-  "24ade993-73be-43ab-bb8a-7c9b92731807": {
-    name: "Sanjay Soren",
-    roll: "2201019",
-    dept: "Computer Science & Engineering",
-    hostel: "Mahanadi Hall of Residence",
-    room: "B-108",
-    phone: "9876543211"
-  },
-  "318beb45-4a69-4be2-ad60-f4587efe9bc5": {
-    name: "Rahul Verma",
-    roll: "2301088",
-    dept: "Mechanical Engineering",
-    hostel: "Day Scholar",
-    room: "N/A",
-    phone: "9876543212"
+function getStudentMeta(gpOrStudentId) {
+  if (typeof gpOrStudentId === "object" && gpOrStudentId !== null) {
+    return {
+      name: gpOrStudentId.student_name || "Enrolled Student",
+      roll: gpOrStudentId.student_roll || "N/A",
+      hostel: gpOrStudentId.student_hostel || "Hostel Residence",
+      room: gpOrStudentId.student_room || "N/A",
+      dept: gpOrStudentId.student_department || "Department",
+      phone: gpOrStudentId.student_phone || "N/A"
+    };
   }
-};
-
-function getStudentMeta(studentId) {
-  if (!studentId) return { name: "Student", roll: "N/A", hostel: "Hostel", room: "N/A", dept: "Engineering" };
-  const cleanId = String(studentId).toLowerCase().replace(/-/g, "");
-  
-  for (const [key, val] of Object.entries(KNOWN_STUDENTS)) {
-    if (key.toLowerCase().replace(/-/g, "") === cleanId) {
-      return val;
-    }
-  }
-
+  const studentId = gpOrStudentId;
+  if (!studentId) return { name: "Student", roll: "N/A", hostel: "Hostel", room: "N/A", dept: "Engineering", phone: "N/A" };
   return {
     name: `Student #${studentId.slice(0, 8)}`,
     roll: "Enrolled Student",
     hostel: "Hostel Residence",
     room: "Resident",
-    dept: "Department"
+    dept: "Department",
+    phone: "N/A"
   };
 }
 
@@ -226,7 +203,7 @@ export async function renderWardenDashboard(mainEl, user) {
         pendingQueueEl.innerHTML = `
           <div style="display: flex; flex-direction: column; gap: 10px;">
             ${pendingList.map(gp => {
-              const meta = getStudentMeta(gp.student_id);
+              const meta = getStudentMeta(gp);
               return `
                 <div class="card" style="padding: 16px; border-left: 4px solid var(--warning);">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
@@ -274,7 +251,7 @@ export async function renderWardenDashboard(mainEl, user) {
         recentLedgerEl.innerHTML = `
           <div style="display: flex; flex-direction: column; gap: 8px;">
             ${decidedPasses.map(gp => {
-              const meta = getStudentMeta(gp.student_id);
+              const meta = getStudentMeta(gp);
               return `
                 <div class="card" style="padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
                   <div>
@@ -444,7 +421,7 @@ export async function renderWardenGatePasses(mainEl) {
     container.innerHTML = `
       <div style="display: flex; flex-direction: column; gap: 12px;">
         ${displayList.map(gp => {
-          const meta = getStudentMeta(gp.student_id);
+          const meta = getStudentMeta(gp);
           const isPending = gp.status === "PENDING";
           const isApproved = gp.status === "APPROVED";
           const isRejected = gp.status === "REJECTED";
@@ -540,7 +517,7 @@ window.openWardenPassModal = async function(passId) {
 
   try {
     const gp = await api.get(`/api/v1/gatepasses/${passId}`);
-    const meta = getStudentMeta(gp.student_id);
+    const meta = getStudentMeta(gp);
     const bodyEl = document.getElementById("wp-modal-body");
     if (!bodyEl) return;
 
@@ -880,7 +857,7 @@ export async function renderHostelFacultyDashboard(mainEl, user) {
               </thead>
               <tbody>
                 ${passes.slice(0, 8).map(gp => {
-                  const meta = getStudentMeta(gp.student_id);
+                  const meta = getStudentMeta(gp);
                   return `
                     <tr>
                       <td style="font-family: var(--font-family-mono); font-weight: 700; color: var(--primary);">
@@ -1080,7 +1057,7 @@ export async function renderHostelComplaints(mainEl, role) {
                   </div>
                 ` : ''}
                 ${c.rating ? `
-                  <div style="margin-top: 6px; font-size: 12px; color: #F59E0B;">
+                  <div style="margin-top: 6px; font-size: 12px; color: var(--color-butter-yellow); filter: drop-shadow(0 0 1px rgba(0,0,0,0.5));">
                     Student Rating: ${'★'.repeat(c.rating)}${'☆'.repeat(5 - c.rating)} (${c.rating}/5)
                   </div>
                 ` : ''}

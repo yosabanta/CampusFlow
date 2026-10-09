@@ -38,8 +38,9 @@ htmlcov/
 *.sqlite
 *.sqlite3
 campusflow_demo.db
+*campusflow*
 
-# File Uploads (keep directory structure via .gitkeep)
+# File Uploads
 uploads/*
 !uploads/.gitkeep
 backend/uploads/*
@@ -48,12 +49,14 @@ backend/uploads/*
 !backend/uploads/documents/.gitkeep
 !backend/uploads/materials/.gitkeep
 
-# IDE & Editor Configs
-.idea/
+# IDE Configs
 .vscode/
-*.swp
-*.swo
+.idea/
 
-# OS Artifacts
-.DS_Store
-Thumbs.db
+# Backups & Scratch Artifacts
+*.backup*
+*.bak
+*.pre_cleanup_backup*
+scratch_edge_profile/
+uploads_backup/
+login_screen.png

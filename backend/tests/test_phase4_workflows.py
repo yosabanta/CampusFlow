@@ -2,6 +2,7 @@ import os
 import uuid
 import hashlib
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -410,17 +411,19 @@ def test_16_and_17_proxy_request_identifies_beneficiary_and_dispatches_otp(clien
     """Test 16 & 17: Student A identifies Student B (2201019) and backend creates 6-digit OTP."""
     student_a_token = get_token(client, "priya.sharma@bput.ac.in")
 
-    resp = client.post(
-        "/api/v1/help-a-friend/initiate",
-        json={"beneficiary_roll_number": "2201019"},
-        headers={"Authorization": f"Bearer {student_a_token}"}
-    )
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["status"] == "OTP_SENT"
-    assert data["beneficiary_roll_number"] == "2201019"
-    assert data["masked_phone"] == "****4102"
-    assert data["expires_in_seconds"] == 300
+    with patch("app.services.proxy_service.twilio_verify_service.start_verification") as mock_start:
+        mock_start.return_value = {"sid": "VExxx1617", "status": "pending", "to": "+919876544102"}
+        resp = client.post(
+            "/api/v1/help-a-friend/initiate",
+            json={"beneficiary_roll_number": "2201019"},
+            headers={"Authorization": f"Bearer {student_a_token}"}
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "OTP_SENT"
+        assert data["beneficiary_roll_number"] == "2201019"
+        assert data["masked_phone"] == "****4102"
+        assert data["expires_in_seconds"] == 600
 
     # Verify OTP was created in database
     db = TestingSessionLocal()
@@ -438,40 +441,43 @@ def test_19_and_20_wrong_otp_and_max_attempts_lockout(client):
     """Test 19 & 20: Incorrect OTP decrements attempts; exceeding 3 attempts locks out request."""
     student_a_token = get_token(client, "priya.sharma@bput.ac.in")
 
-    # Attempt 1: Wrong code
-    resp1 = client.post(
-        "/api/v1/help-a-friend/verify-otp",
-        json={"beneficiary_roll_number": "2201019", "otp_code": "000000"},
-        headers={"Authorization": f"Bearer {student_a_token}"}
-    )
-    assert resp1.status_code == 400
-    assert "2 attempt(s) remaining" in resp1.json()["error"]["message"]
+    with patch("app.services.proxy_service.twilio_verify_service.check_verification") as mock_check:
+        mock_check.return_value = {"sid": "VExxx", "status": "pending", "valid": False}
 
-    # Attempt 2: Wrong code
-    resp2 = client.post(
-        "/api/v1/help-a-friend/verify-otp",
-        json={"beneficiary_roll_number": "2201019", "otp_code": "111111"},
-        headers={"Authorization": f"Bearer {student_a_token}"}
-    )
-    assert resp2.status_code == 400
-    assert "1 attempt(s) remaining" in resp2.json()["error"]["message"]
+        # Attempt 1: Wrong code
+        resp1 = client.post(
+            "/api/v1/help-a-friend/verify-otp",
+            json={"beneficiary_roll_number": "2201019", "otp_code": "000000"},
+            headers={"Authorization": f"Bearer {student_a_token}"}
+        )
+        assert resp1.status_code == 400
+        assert "2 attempt(s) remaining" in resp1.json()["error"]["message"]
 
-    # Attempt 3: Wrong code
-    resp3 = client.post(
-        "/api/v1/help-a-friend/verify-otp",
-        json={"beneficiary_roll_number": "2201019", "otp_code": "222222"},
-        headers={"Authorization": f"Bearer {student_a_token}"}
-    )
-    assert resp3.status_code == 400
+        # Attempt 2: Wrong code
+        resp2 = client.post(
+            "/api/v1/help-a-friend/verify-otp",
+            json={"beneficiary_roll_number": "2201019", "otp_code": "111111"},
+            headers={"Authorization": f"Bearer {student_a_token}"}
+        )
+        assert resp2.status_code == 400
+        assert "1 attempt(s) remaining" in resp2.json()["error"]["message"]
 
-    # Attempt 4: Should be locked out
-    resp4 = client.post(
-        "/api/v1/help-a-friend/verify-otp",
-        json={"beneficiary_roll_number": "2201019", "otp_code": "333333"},
-        headers={"Authorization": f"Bearer {student_a_token}"}
-    )
-    assert resp4.status_code == 400
-    assert "exceeded" in resp4.json()["error"]["message"].lower()
+        # Attempt 3: Wrong code
+        resp3 = client.post(
+            "/api/v1/help-a-friend/verify-otp",
+            json={"beneficiary_roll_number": "2201019", "otp_code": "222222"},
+            headers={"Authorization": f"Bearer {student_a_token}"}
+        )
+        assert resp3.status_code == 400
+
+        # Attempt 4: Should be locked out
+        resp4 = client.post(
+            "/api/v1/help-a-friend/verify-otp",
+            json={"beneficiary_roll_number": "2201019", "otp_code": "333333"},
+            headers={"Authorization": f"Bearer {student_a_token}"}
+        )
+        assert resp4.status_code == 400
+        assert "exceeded" in resp4.json()["error"]["message"].lower()
 
 
 def test_21_expired_otp_fails(client):
@@ -514,8 +520,8 @@ def test_18_22_23_correct_otp_succeeds_single_use_request_belongs_to_beneficiary
     valid_otp = "654321"
     valid_record = OTPVerification(
         beneficiary_student_id=beneficiary.id,
-        phone_number="9876544102",
-        otp_code_hash=hashlib.sha256(valid_otp.encode("utf-8")).hexdigest(),
+        phone_number="+919876544102",
+        otp_code_hash=hashlib.sha256(b"validsid").hexdigest(),
         purpose="HELP_A_FRIEND",
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
         attempts=0,
@@ -527,14 +533,16 @@ def test_18_22_23_correct_otp_succeeds_single_use_request_belongs_to_beneficiary
     otp_id = str(valid_record.id)
     db.close()
 
-    # Verify correct OTP
-    verify_resp = client.post(
-        "/api/v1/help-a-friend/verify-otp",
-        json={"beneficiary_roll_number": "2201019", "otp_code": valid_otp},
-        headers={"Authorization": f"Bearer {student_a_token}"}
-    )
-    assert verify_resp.status_code == 200
-    assert verify_resp.json()["status"] == "VERIFIED"
+    # Verify correct OTP via mocked Twilio Verify check
+    with patch("app.services.proxy_service.twilio_verify_service.check_verification") as mock_check:
+        mock_check.return_value = {"sid": "VExxx", "status": "approved", "valid": True}
+        verify_resp = client.post(
+            "/api/v1/help-a-friend/verify-otp",
+            json={"beneficiary_roll_number": "2201019", "otp_code": valid_otp},
+            headers={"Authorization": f"Bearer {student_a_token}"}
+        )
+        assert verify_resp.status_code == 200
+        assert verify_resp.json()["status"] == "VERIFIED"
 
     # Submit complaint via proxy
     submit_resp = client.post(
@@ -647,3 +655,49 @@ def test_26_27_28_admin_approves_pdf_generated_and_qr_stamped(client):
     assert dl_resp.status_code == 200
     assert dl_resp.headers["content-type"] == "application/pdf"
     assert dl_resp.content.startswith(b"%PDF")
+
+
+def test_21_help_a_friend_with_matching_mobile_number(client):
+    """Test 21: Student A initiates proxy with matching mobile number via Twilio Verify."""
+    student_a_token = get_token(client, "priya.sharma@bput.ac.in")
+
+    # Clear prior pending OTP records to reset 60-second cooldown
+    db = TestingSessionLocal()
+    beneficiary = db.query(Student).filter(Student.roll_number == "2201019").first()
+    db.query(OTPVerification).filter(OTPVerification.beneficiary_student_id == beneficiary.id).delete()
+    db.commit()
+    db.close()
+
+    with patch("app.services.proxy_service.twilio_verify_service.start_verification") as mock_start:
+        mock_start.return_value = {"sid": "VExxx21", "status": "pending", "to": "+919876544102"}
+        resp = client.post(
+            "/api/v1/help-a-friend/initiate",
+            json={
+                "student_id": "2201019",
+                "student_mobile_number": "+91 9876544102"
+            },
+            headers={"Authorization": f"Bearer {student_a_token}"}
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "OTP_SENT"
+        assert data["beneficiary_roll_number"] == "2201019"
+        assert data["demo_otp"] is None
+        assert data["student_mobile"] == "+91 9876544102"
+
+
+def test_22_help_a_friend_with_mismatched_mobile_number_fails(client):
+    """Test 22: Student A initiates proxy with mismatched mobile number and gets 400 error."""
+    student_a_token = get_token(client, "priya.sharma@bput.ac.in")
+
+    resp = client.post(
+        "/api/v1/help-a-friend/initiate",
+        json={
+            "student_id": "2201019",
+            "student_mobile_number": "+91 9876500000"
+        },
+        headers={"Authorization": f"Bearer {student_a_token}"}
+    )
+    assert resp.status_code == 400
+    assert "does not match the registered contact number" in resp.json()["error"]["message"]
+

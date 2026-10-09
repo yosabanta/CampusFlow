@@ -104,12 +104,16 @@ export function formatRequisitionStatusBadge(status) {
   }
 }
 
-// Known sample roster for quick roll call demo
-const DEMO_STUDENT_ROSTER = [
-  { id: "b84a4d69-d4a7-48e8-a9fa-987d7c38b0da", name: "Priya Sharma", roll: "2201042", branch: "Computer Science & Engineering", batch: 2022, sec: "A" },
-  { id: "24ade993-73be-43ab-bb8a-7c9b92731807", name: "Sanjay Soren", roll: "2201019", branch: "Computer Science & Engineering", batch: 2022, sec: "B" },
-  { id: "318beb45-4a69-4be2-ad60-f4587efe9bc5", name: "Rahul Verma", roll: "2301088", branch: "Mechanical Engineering", batch: 2023, sec: "A" }
-];
+// Dynamic Cohort Student Roster Fetcher
+async function getCohortStudentRoster(branch, batchYear, section) {
+  try {
+    const students = await api.get(`/api/v1/attendance/roster?branch=${encodeURIComponent(branch)}&batch_year=${batchYear}&section=${encodeURIComponent(section)}`);
+    return students || [];
+  } catch (err) {
+    console.warn("Failed to load student roster from backend:", err);
+    return [];
+  }
+}
 
 
 /* ==========================================================================
@@ -243,10 +247,11 @@ export async function renderTeacherDashboard(mainEl, user) {
 
   // Fetch Live Backend Data in Parallel
   try {
-    const [noticesRes, materialsRes, notifsRes] = await Promise.allSettled([
+    const [noticesRes, materialsRes, notifsRes, sessionsRes] = await Promise.allSettled([
       api.get("/api/v1/class-notices"),
       api.get("/api/v1/materials"),
-      api.get("/api/v1/notifications")
+      api.get("/api/v1/notifications"),
+      api.get("/api/v1/attendance/sessions")
     ]);
 
     const notices = noticesRes.status === "fulfilled" ? (noticesRes.value || []) : [];
@@ -255,8 +260,8 @@ export async function renderTeacherDashboard(mainEl, user) {
     const notifs = notifsData.notifications || [];
     const unreadCount = notifsData.unread_count || notifs.filter(n => !n.is_read).length;
 
-    // Load recent stored sessions
-    const storedSessions = getStoredSessions();
+    // Load recent database-backed sessions
+    const storedSessions = sessionsRes.status === "fulfilled" ? (sessionsRes.value || []) : getStoredSessions();
 
     // Update KPI counters
     document.getElementById("kpi-sessions-count")?.replaceChildren(document.createTextNode(String(storedSessions.length)));
@@ -479,11 +484,16 @@ export async function renderTeacherAttendance(mainEl, preselectedSessionId = nul
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const renderAttendanceHistory = () => {
+  const renderAttendanceHistory = async () => {
     const historyEl = document.getElementById("attendance-history-container");
     if (!historyEl) return;
 
-    const stored = getStoredSessions();
+    let stored = [];
+    try {
+      stored = await api.get("/api/v1/attendance/sessions");
+    } catch {
+      stored = getStoredSessions();
+    }
     if (stored.length === 0) {
       historyEl.innerHTML = `
         <div class="state-container" style="padding: 30px 16px;">
@@ -556,14 +566,8 @@ export async function renderTeacherAttendance(mainEl, preselectedSessionId = nul
 
       renderAttendanceHistory();
 
-      // Filter cohort roster to match session if applicable, or fallback to all demo students
-      let cohortRoster = DEMO_STUDENT_ROSTER.filter(st => 
-        st.branch.toLowerCase().includes(session.branch.toLowerCase()) || 
-        st.sec === session.section
-      );
-      if (cohortRoster.length === 0) {
-        cohortRoster = DEMO_STUDENT_ROSTER;
-      }
+      // Fetch real cohort roster from backend for this session's branch, batch, and section
+      let cohortRoster = await getCohortStudentRoster(session.branch, session.batch_year, session.section);
 
       // Map recorded status if exists
       const recordedMap = {};

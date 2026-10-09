@@ -49,4 +49,16 @@ class StudentAttendanceSummary(BaseModel):
     absent_count: int
     late_count: int
     attendance_percentage: float
+    is_shortage: bool = False
     records: List[AttendanceRecordResponse]
+
+
+class StudentRosterItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    name: str
+    roll: str
+    branch: str
+    batch: int
+    sec: str
+
